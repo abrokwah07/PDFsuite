@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local PDF Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Small custom animation for loading states */
+        @keyframes pulse-border {
+            0% { border-color: #e5e7eb; }
+            50% { border-color: #3b82f6; }
+            100% { border-color: #e5e7eb; }
+        }
+        .processing { animation: pulse-border 2s infinite; pointer-events: none; opacity: 0.7; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col selection:bg-blue-200">
+
+    <nav class="bg-white shadow-sm border-b sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 text-white p-2 rounded-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                </div>
+                <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">PDF<span class="text-blue-600">Suite</span></h1>
+            </div>
+            <div class="text-sm font-medium text-slate-500">Local & Secure</div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl mx-auto w-full mt-8 px-4 sm:px-6 lg:px-8 mb-12">
+        
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-slate-900">Workspace</h2>
+            <p class="text-slate-500 mt-1">All processing happens locally on your machine. Your files are safe.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 align-top">
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-md transition-shadow">
+                <div class="flex items-center mb-4 space-x-3">
+                    <div class="bg-blue-100 text-blue-600 p-2 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">Merge PDFs</h3>
+                </div>
+                <p class="text-sm text-slate-500 mb-4 flex-grow">Combine multiple PDF files into a single document.</p>
+                
+                <input type="file" id="merge-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-3">
+                <div id="merge-list" class="text-xs text-slate-500 mb-3 truncate hidden"></div>
+                
+                <button id="merge-btn" class="w-full bg-slate-900 hover:bg-blue-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
+                    Merge Files
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-md transition-shadow">
+                <div class="flex items-center mb-4 space-x-3">
+                    <div class="bg-green-100 text-green-600 p-2 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">Compress PDF</h3>
+                </div>
+                <p class="text-sm text-slate-500 mb-4 flex-grow">Reduce the file size of your document significantly.</p>
+                
+                <input type="file" id="compress-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 mb-3">
+                
+                <button id="compress-btn" class="w-full bg-slate-900 hover:bg-green-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
+                    Compress File
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-md transition-shadow">
+                <div class="flex items-center mb-4 space-x-3">
+                    <div class="bg-purple-100 text-purple-600 p-2 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">Extract Pages</h3>
+                </div>
+                <p class="text-sm text-slate-500 mb-4 flex-grow">Pull specific pages out into a new document.</p>
+                
+                <input type="file" id="split-input" accept="application/pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 mb-3">
+                <input type="text" id="pages-input" placeholder="Pages (e.g., 1, 3, 5-7)" class="w-full text-sm border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-purple-500 focus:bg-white transition-colors">
+                
+                <button id="split-btn" class="w-full bg-slate-900 hover:bg-purple-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
+                    Extract Pages
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-md transition-shadow">
+                <div class="flex items-center mb-4 space-x-3">
+                    <div class="bg-yellow-100 text-yellow-600 p-2 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">Searchable PDF (OCR)</h3>
+                </div>
+                <p class="text-sm text-slate-500 mb-4 flex-grow">Use AI to read scanned documents and make text selectable.</p>
+                
+                <input type="file" id="ocr-input" accept="application/pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 file:text-yellow-700 hover:file:bg-yellow-100 mb-3">
+                <p id="ocr-warning" class="text-xs text-yellow-600 font-medium mb-3 hidden">This process is intensive and may take a few minutes.</p>
+                
+                <button id="ocr-btn" class="w-full bg-slate-900 hover:bg-yellow-500 hover:text-slate-900 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
+                    Run OCR Scan
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-md transition-shadow">
+                <div class="flex items-center mb-4 space-x-3">
+                    <div class="bg-indigo-100 text-indigo-600 p-2 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">Office to PDF</h3>
+                </div>
+                <p class="text-sm text-slate-500 mb-4 flex-grow">Convert Word, Excel, or PowerPoint files into PDF documents.</p>
+                
+                <input type="file" id="to-pdf-input" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 mb-3">
+                
+                <button id="to-pdf-btn" class="w-full bg-slate-900 hover:bg-indigo-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
+                    Convert to PDF
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-md transition-shadow">
+                <div class="flex items-center mb-4 space-x-3">
+                    <div class="bg-teal-100 text-teal-600 p-2 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">PDF to Word</h3>
+                </div>
+                <p class="text-sm text-slate-500 mb-4 flex-grow">Extract text and layout from a PDF into an editable Word document.</p>
+                
+                <input type="file" id="to-word-input" accept="application/pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 mb-3">
+                
+                <button id="to-word-btn" class="w-full bg-slate-900 hover:bg-teal-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
+                    Convert to Word
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col hover:shadow-md transition-shadow lg:col-span-2">
+                <div class="flex items-center mb-4 space-x-3">
+                    <div class="bg-red-100 text-red-600 p-2 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">Protect & Restrict</h3>
+                </div>
+                <p class="text-sm text-slate-500 mb-4">Add passwords and restrict editing, printing, or copying.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <input type="file" id="protect-input" accept="application/pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100 mb-3">
+                        <input type="password" id="open-password" placeholder="Open Password (Optional)" class="w-full text-sm border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-red-500 focus:bg-white transition-colors">
+                        <input type="password" id="owner-password" placeholder="Owner Password (Req. for locks)" class="w-full text-sm border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-red-500 focus:bg-white transition-colors">
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Lock Features</span>
+                        <label class="flex items-center space-x-2 text-sm text-slate-600 mb-2">
+                            <input type="checkbox" id="disable-print" class="rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Printing</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-sm text-slate-600 mb-2">
+                            <input type="checkbox" id="disable-copy" class="rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Copying</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-sm text-slate-600">
+                            <input type="checkbox" id="disable-modify" class="rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Editing</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <button id="protect-btn" class="w-full bg-slate-900 hover:bg-red-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
+                    Secure PDF
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // Helper function to handle API calls universally
+        async function processFile(url, formData, btnElement, defaultText, processingText, fileNamePrefix, fileName) {
+            const originalContainer = btnElement.parentElement;
+            btnElement.textContent = processingText;
+            btnElement.disabled = true;
+            originalContainer.classList.add('processing');
+
+            try {
+                const response = await fetch(url, { method: 'POST', body: formData });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = downloadUrl;
+                    
+                    // NEW: Check if the server sent a ZIP or a standard file
+                    const contentType = response.headers.get('Content-Type');
+                    if (contentType === 'application/zip') {
+                        a.download = `${fileNamePrefix}_batch.zip`;
+                    } else {
+                        a.download = `${fileNamePrefix}_${fileName}`;
+                    }
+                    
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(downloadUrl);
+                } else {
+                    alert(`Error processing file on the server.`);
+                }
+            } catch (error) {
+                console.error('API Error:', error);
+                alert("Something went wrong communicating with the server.");
+            } finally {
+                btnElement.textContent = defaultText;
+                originalContainer.classList.remove('processing');
+                // We do not re-enable the button here, let the input listeners handle validation
+            }
+        }
+
+        // --- 1. MERGE LOGIC ---
+        const mergeInput = document.getElementById('merge-input');
+        const mergeBtn = document.getElementById('merge-btn');
+        const mergeList = document.getElementById('merge-list');
+        
+        mergeInput.addEventListener('change', (e) => {
+            const fileCount = e.target.files.length;
+            if (fileCount > 1) {
+                mergeBtn.disabled = false;
+                mergeList.textContent = `${fileCount} files selected`;
+                mergeList.classList.remove('hidden');
+            } else {
+                mergeBtn.disabled = true;
+                mergeList.classList.add('hidden');
+            }
+        });
+
+        mergeBtn.addEventListener('click', async () => {
+            const formData = new FormData();
+            Array.from(mergeInput.files).forEach(file => formData.append('files', file));
+            await processFile('/api/merge', formData, mergeBtn, 'Merge Files', 'Merging...', 'merged', 'document.pdf');
+            mergeInput.value = ''; // Reset
+            mergeBtn.disabled = true;
+            mergeList.classList.add('hidden');
+        });
+
+        // --- 2. COMPRESS LOGIC (Upgraded for Batch) ---
+        const compressInput = document.getElementById('compress-input');
+        const compressBtn = document.getElementById('compress-btn');
+        
+        compressInput.addEventListener('change', (e) => { compressBtn.disabled = e.target.files.length === 0; });
+        
+        compressBtn.addEventListener('click', async () => {
+            const formData = new FormData();
+            
+            // NEW: Loop through all selected files and append them to formData
+            Array.from(compressInput.files).forEach(file => {
+                formData.append('files', file); // Notice this matches 'files' in main.py
+            });
+            
+            // We pass the name of the first file as a fallback
+            const firstFileName = compressInput.files[0].name;
+            const fileCount = compressInput.files.length;
+            const btnText = fileCount > 1 ? `Compressing ${fileCount} files...` : 'Compressing...';
+            
+            await processFile('/api/compress', formData, compressBtn, 'Compress File(s)', btnText, 'compressed', firstFileName);
+            compressInput.value = '';
+            compressBtn.disabled = true;
+        });
+
+        // --- 3. EXTRACT LOGIC ---
+        const splitInput = document.getElementById('split-input');
+        const pagesInput = document.getElementById('pages-input');
+        const splitBtn = document.getElementById('split-btn');
+
+        function checkSplit() { splitBtn.disabled = !(splitInput.files.length > 0 && pagesInput.value.trim() !== ''); }
+        splitInput.addEventListener('change', checkSplit);
+        pagesInput.addEventListener('input', checkSplit);
+
+        splitBtn.addEventListener('click', async () => {
+            const file = splitInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('pages', pagesInput.value);
+            await processFile('/api/split', formData, splitBtn, 'Extract Pages', 'Extracting...', 'extracted', file.name);
+            splitInput.value = ''; pagesInput.value = '';
+            splitBtn.disabled = true;
+        });
+
+        // --- 4. OCR LOGIC ---
+        const ocrInput = document.getElementById('ocr-input');
+        const ocrBtn = document.getElementById('ocr-btn');
+        const ocrWarning = document.getElementById('ocr-warning');
+
+        ocrInput.addEventListener('change', (e) => { 
+            ocrBtn.disabled = e.target.files.length === 0; 
+            if(e.target.files.length > 0) ocrWarning.classList.remove('hidden');
+            else ocrWarning.classList.add('hidden');
+        });
+
+        ocrBtn.addEventListener('click', async () => {
+            const file = ocrInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            await processFile('/api/ocr', formData, ocrBtn, 'Run OCR Scan', 'Scanning...', 'searchable', file.name);
+            ocrInput.value = '';
+            ocrWarning.classList.add('hidden');
+            ocrBtn.disabled = true;
+        });
+
+        // --- 5. PROTECT LOGIC ---
+        const protectInput = document.getElementById('protect-input');
+        const openPassword = document.getElementById('open-password');
+        const ownerPassword = document.getElementById('owner-password');
+        const disablePrint = document.getElementById('disable-print');
+        const disableCopy = document.getElementById('disable-copy');
+        const disableModify = document.getElementById('disable-modify');
+        const protectBtn = document.getElementById('protect-btn');
+
+        function checkProtect() {
+            const hasFile = protectInput.files.length > 0;
+            const hasRestrictions = disablePrint.checked || disableCopy.checked || disableModify.checked;
+            let isValid = false;
+            
+            if (hasFile) {
+                if (hasRestrictions) isValid = ownerPassword.value.trim() !== '';
+                else isValid = openPassword.value.trim() !== '' || ownerPassword.value.trim() !== '';
+            }
+            protectBtn.disabled = !isValid;
+        }
+
+        [protectInput, openPassword, ownerPassword, disablePrint, disableCopy, disableModify].forEach(el => {
+            el.addEventListener('change', checkProtect);
+            el.addEventListener('input', checkProtect);
+        });
+
+        protectBtn.addEventListener('click', async () => {
+            const file = protectInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('open_password', openPassword.value);
+            formData.append('owner_password', ownerPassword.value);
+            formData.append('disable_print', disablePrint.checked);
+            formData.append('disable_copy', disableCopy.checked);
+            formData.append('disable_modify', disableModify.checked);
+
+            await processFile('/api/protect', formData, protectBtn, 'Secure PDF', 'Locking...', 'protected', file.name);
+            protectInput.value = ''; openPassword.value = ''; ownerPassword.value = '';
+            disablePrint.checked = false; disableCopy.checked = false; disableModify.checked = false;
+            protectBtn.disabled = true;
+        });
+        // --- 6. OFFICE TO PDF LOGIC ---
+        const toPdfInput = document.getElementById('to-pdf-input');
+        const toPdfBtn = document.getElementById('to-pdf-btn');
+        
+        toPdfInput.addEventListener('change', (e) => { toPdfBtn.disabled = e.target.files.length === 0; });
+        
+        toPdfBtn.addEventListener('click', async () => {
+            const file = toPdfInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Remove the old extension (e.g., .docx) to just pass the base name to our helper
+            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+            await processFile('/api/convert/to-pdf', formData, toPdfBtn, 'Convert to PDF', 'Converting...', baseName, 'converted.pdf');
+            
+            toPdfInput.value = '';
+            toPdfBtn.disabled = true;
+        });
+
+        // --- 7. PDF TO WORD LOGIC ---
+        const toWordInput = document.getElementById('to-word-input');
+        const toWordBtn = document.getElementById('to-word-btn');
+        
+        toWordInput.addEventListener('change', (e) => { toWordBtn.disabled = e.target.files.length === 0; });
+        
+        toWordBtn.addEventListener('click', async () => {
+            const file = toWordInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+            await processFile('/api/convert/to-word', formData, toWordBtn, 'Convert to Word', 'Extracting...', baseName, 'converted.docx');
+            
+            toWordInput.value = '';
+            toWordBtn.disabled = true;
+        });
+    </script>
+</body>
+</html>
