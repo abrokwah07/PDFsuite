@@ -4,3 +4,7 @@ python-multipart==0.0.9
 pypdf==4.1.0
 ocrmypdf
 pdf2docx
+pdfplumber
+pandas
+openpyxl
+reportlab

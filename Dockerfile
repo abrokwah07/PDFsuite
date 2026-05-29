@@ -1,10 +1,10 @@
-# Use an official Python runtime as a parent image
+# 1. Use the lightweight Python base image
 FROM python:3.11-slim
 
-# Set the working directory in the container
+# 2. Set the working directory
 WORKDIR /app
 
-# Install system dependencies (Ghostscript, Tesseract OCR, QPDF)
+# 3. Install system dependencies and immediately clean up the apt cache to reduce image size
 RUN apt-get update && apt-get install -y \
     ghostscript \
     tesseract-ocr \
@@ -12,17 +12,15 @@ RUN apt-get update && apt-get install -y \
     libreoffice \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the requirements file into the container
+# 4. Copy requirements and install Python packages securely
 COPY requirements.txt .
-
-# Install the Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your application code
+# 5. Copy the rest of the application code
 COPY . .
 
-# Expose port 8000 for the web server
+# 6. Expose the port
 EXPOSE 8000
 
-# Command to run the application
+# 7. Start the server (Notice: NO --reload flag for production to save memory)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

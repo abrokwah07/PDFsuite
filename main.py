@@ -3,11 +3,15 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pypdf import PdfWriter, PdfReader
 from pypdf.constants import UserAccessPermissions
 from pdf2docx import Converter
+from reportlab.pdfgen import canvas
 import os
 import tempfile
 import subprocess
 import ocrmypdf
 import zipfile
+import pdfplumber
+import pandas as pd
+import io
 
 app = FastAPI()
 
@@ -294,3 +298,116 @@ async def convert_to_word(file: UploadFile = File(...)):
     except Exception as e:
         print(f"--- CONVERT TO WORD ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to convert PDF to Word.")
+    # 9. Handle PDF to Excel Conversion (Extract Tables)
+@app.post("/api/convert/to-excel")
+async def convert_to_excel(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        output_xlsx = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx").name
+
+        # Extract tables using pdfplumber and save via pandas
+        with pdfplumber.open(input_path) as pdf:
+            all_tables = []
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                for table in tables:
+                    df = pd.DataFrame(table[1:], columns=table[0])
+                    all_tables.append(df)
+
+        if not all_tables:
+            os.unlink(input_path)
+            raise HTTPException(status_code=400, detail="No tables found in this PDF.")
+
+        # Write all found tables into separate sheets in the Excel file
+        with pd.ExcelWriter(output_xlsx, engine='openpyxl') as writer:
+            for i, df in enumerate(all_tables):
+                df.to_excel(writer, sheet_name=f"Table_{i+1}", index=False)
+
+        os.unlink(input_path) 
+
+        base_name = os.path.splitext(file.filename)[0]
+        return FileResponse(
+            path=output_xlsx, 
+            filename=f"{base_name}.xlsx", 
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        print(f"--- CONVERT TO EXCEL ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to convert PDF to Excel.")
+    
+    # 10. Handle Watermarking
+@app.post("/api/watermark")
+async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+
+        # Create the watermark PDF in memory (no need to save to disk)
+        packet = io.BytesIO()
+        can = canvas.Canvas(packet)
+        can.setFont("Helvetica-Bold", 72)
+        can.setFillColorRGB(0.5, 0.5, 0.5, alpha=0.3) # Transparent Gray
+        
+        # Position and rotate the text diagonally
+        can.translate(300, 400)
+        can.rotate(45)
+        can.drawCentredString(0, 0, text)
+        can.save()
+        
+        packet.seek(0)
+        watermark = PdfReader(packet)
+
+        # Stamp the watermark onto every page
+        for page in reader.pages:
+            page.merge_page(watermark.pages[0])
+            writer.add_page(page)
+
+        output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+        writer.write(output_path)
+        writer.close()
+        os.unlink(input_path)
+
+        base_name = os.path.splitext(file.filename)[0]
+        return FileResponse(path=output_path, filename=f"watermarked_{base_name}.pdf", media_type='application/pdf')
+    except Exception as e:
+        print(f"--- WATERMARK ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add watermark.")
+
+# 11. Handle Metadata Scrubbing
+@app.post("/api/scrub")
+async def scrub_metadata(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+
+        # Copy all pages
+        for page in reader.pages:
+            writer.add_page(page)
+
+        # Overwrite the metadata dictionary with an empty set
+        writer.add_metadata({})
+
+        output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+        writer.write(output_path)
+        writer.close()
+        os.unlink(input_path)
+
+        base_name = os.path.splitext(file.filename)[0]
+        return FileResponse(path=output_path, filename=f"scrubbed_{base_name}.pdf", media_type='application/pdf')
+    except Exception as e:
+        print(f"--- SCRUB ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to scrub metadata.")
