@@ -3,11 +3,15 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pypdf import PdfWriter, PdfReader
 from pypdf.constants import UserAccessPermissions
 from pdf2docx import Converter
+from reportlab.pdfgen import canvas
 import os
 import tempfile
 import subprocess
 import ocrmypdf
 import zipfile
+import pdfplumber
+import pandas as pd
+import io
 
 app = FastAPI()
 
@@ -294,3 +298,161 @@ async def convert_to_word(file: UploadFile = File(...)):
     except Exception as e:
         print(f"--- CONVERT TO WORD ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to convert PDF to Word.")
+    # 9. Handle PDF to Excel Conversion (With Smart OCR Router)
+@app.post("/api/convert/to-excel")
+async def convert_to_excel(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        output_xlsx = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx").name
+        working_pdf_path = input_path
+
+        # ==========================================
+        # STEP 1: The "Smart Router" Pre-Flight Check
+        # ==========================================
+        try:
+            reader = PdfReader(input_path)
+            # Sample the first page to see if there is a hidden text layer
+            sample_text = reader.pages[0].extract_text() or ""
+            
+            if len(sample_text.strip()) < 20:
+                print("--- SMART ROUTER: Image detected. Routing to OCR first... ---")
+                ocr_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+                ocrmypdf.ocr(input_path, ocr_path, force_ocr=True, output_type='pdf')
+                working_pdf_path = ocr_path
+            else:
+                print("--- SMART ROUTER: Native text detected. Skipping OCR... ---")
+        except Exception as e:
+            print(f"Pre-flight check failed, proceeding safely: {str(e)}")
+
+        # ==========================================
+        # STEP 2: Extract Tables
+        # ==========================================
+        all_tables = []
+        with pdfplumber.open(working_pdf_path) as pdf:
+            # Use text-alignment strategy to handle borderless tables (like your screenshot)
+            custom_settings = {"vertical_strategy": "text", "horizontal_strategy": "text"}
+            
+            for page in pdf.pages:
+                tables = page.extract_tables(custom_settings)
+                for table in tables:
+                    # Clean empty cells
+                    cleaned_table = [[cell if cell is not None else "" for cell in row] for row in table]
+                    if len(cleaned_table) > 1:
+                        df = pd.DataFrame(cleaned_table[1:])
+                        headers = cleaned_table[0]
+                        
+                        # Pad or truncate headers so pandas doesn't crash on messy data
+                        if len(headers) < len(df.columns):
+                            headers.extend([f"Column_{i}" for i in range(len(headers), len(df.columns))])
+                        elif len(headers) > len(df.columns):
+                            headers = headers[:len(df.columns)]
+                            
+                        df.columns = headers
+                        all_tables.append(df)
+
+        # Cleanup the temporary OCR file if we created one
+        if working_pdf_path != input_path and os.path.exists(working_pdf_path):
+            os.unlink(working_pdf_path)
+
+        if not all_tables:
+            os.unlink(input_path)
+            raise HTTPException(status_code=400, detail="No tables found in this document.")
+
+        # ==========================================
+        # STEP 3: Package into Excel
+        # ==========================================
+        with pd.ExcelWriter(output_xlsx, engine='openpyxl') as writer:
+            for i, df in enumerate(all_tables):
+                df.to_excel(writer, sheet_name=f"Table_{i+1}", index=False)
+
+        os.unlink(input_path) 
+
+        base_name = os.path.splitext(file.filename)[0]
+        return FileResponse(
+            path=output_xlsx, 
+            filename=f"{base_name}.xlsx", 
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"--- CONVERT TO EXCEL ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to convert PDF to Excel.")
+    
+    # 10. Handle Watermarking
+@app.post("/api/watermark")
+async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+
+        # Create the watermark PDF in memory (no need to save to disk)
+        packet = io.BytesIO()
+        can = canvas.Canvas(packet)
+        can.setFont("Helvetica-Bold", 72)
+        can.setFillColorRGB(0.5, 0.5, 0.5, alpha=0.3) # Transparent Gray
+        
+        # Position and rotate the text diagonally
+        can.translate(300, 400)
+        can.rotate(45)
+        can.drawCentredString(0, 0, text)
+        can.save()
+        
+        packet.seek(0)
+        watermark = PdfReader(packet)
+
+        # Stamp the watermark onto every page
+        for page in reader.pages:
+            page.merge_page(watermark.pages[0])
+            writer.add_page(page)
+
+        output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+        writer.write(output_path)
+        writer.close()
+        os.unlink(input_path)
+
+        base_name = os.path.splitext(file.filename)[0]
+        return FileResponse(path=output_path, filename=f"watermarked_{base_name}.pdf", media_type='application/pdf')
+    except Exception as e:
+        print(f"--- WATERMARK ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add watermark.")
+
+# 11. Handle Metadata Scrubbing
+@app.post("/api/scrub")
+async def scrub_metadata(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+
+        # Copy all pages
+        for page in reader.pages:
+            writer.add_page(page)
+
+        # Overwrite the metadata dictionary with an empty set
+        writer.add_metadata({})
+
+        output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+        writer.write(output_path)
+        writer.close()
+        os.unlink(input_path)
+
+        base_name = os.path.splitext(file.filename)[0]
+        return FileResponse(path=output_path, filename=f"scrubbed_{base_name}.pdf", media_type='application/pdf')
+    except Exception as e:
+        print(f"--- SCRUB ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to scrub metadata.")

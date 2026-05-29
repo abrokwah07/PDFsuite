@@ -1,8 +1,6 @@
-version: '3.8'
 services:
   pdf-app:
     build: .
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app  # This syncs your local folder to the container so you don't have to rebuild every time you change Python code
+    restart: always
