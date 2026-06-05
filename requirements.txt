@@ -2,9 +2,12 @@ fastapi==0.110.0
 uvicorn==0.27.1
 python-multipart==0.0.9
 pypdf==4.1.0
+PyPDF2==2.12.1
 ocrmypdf
 pdf2docx
 pdfplumber
 pandas
 openpyxl
 reportlab
+camelot-py[cv]
+lxml

@@ -12,6 +12,7 @@ import zipfile
 import pdfplumber
 import pandas as pd
 import io
+import camelot
 
 app = FastAPI()
 
@@ -54,7 +55,7 @@ async def merge_pdfs(files: list[UploadFile] = File(...)):
 
 # 3. Handle PDF Compression (Upgraded for Batch Processing)
 @app.post("/api/compress")
-async def compress_pdf(files: list[UploadFile] = File(...)): # Note: 'files' is now a list
+async def compress_pdf(files: list[UploadFile] = File(...)): 
     processed_files = []
     
     try:
@@ -111,7 +112,7 @@ async def split_pdf(file: UploadFile = File(...), pages: str = Form(...)):
                 start, end = part.split("-")
                 # Add all numbers in the range
                 for p in range(int(start), int(end) + 1):
-                    page_indices.add(p - 1) # Subtract 1 because Python counts from 0
+                    page_indices.add(p - 1) 
             else:
                 page_indices.add(int(part) - 1)
         
@@ -137,7 +138,7 @@ async def split_pdf(file: UploadFile = File(...), pages: str = Form(...)):
         output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
         writer.write(output_path)
         writer.close()
-        os.unlink(input_path) # Clean up
+        os.unlink(input_path) 
 
         return FileResponse(
             path=output_path, 
@@ -148,7 +149,7 @@ async def split_pdf(file: UploadFile = File(...), pages: str = Form(...)):
         print(f"--- SPLIT ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to extract pages.")
     
-    # 5. Handle OCR (Make PDF Searchable)
+# 5. Handle OCR (Make PDF Searchable)
 @app.post("/api/ocr")
 async def ocr_pdf(file: UploadFile = File(...)):
     # Save the uploaded file temporarily
@@ -163,7 +164,7 @@ async def ocr_pdf(file: UploadFile = File(...)):
     try:
         # Run OCR. force_ocr=True ensures it processes even if it thinks there is already text.
         ocrmypdf.ocr(input_path, output_path, force_ocr=True)
-        os.unlink(input_path) # Clean up input
+        os.unlink(input_path) 
         
         return FileResponse(
             path=output_path, 
@@ -175,7 +176,7 @@ async def ocr_pdf(file: UploadFile = File(...)):
         os.unlink(input_path)
         raise HTTPException(status_code=500, detail="OCR processing failed.")
     
-    # 6. Handle PDF Security (Advanced Permissions)
+# 6. Handle PDF Security (Advanced Permissions)
 @app.post("/api/protect")
 async def protect_pdf(
     file: UploadFile = File(...), 
@@ -222,7 +223,7 @@ async def protect_pdf(
         output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
         writer.write(output_path)
         writer.close()
-        os.unlink(input_path) # Clean up input
+        os.unlink(input_path) 
 
         return FileResponse(
             path=output_path, 
@@ -233,7 +234,7 @@ async def protect_pdf(
         print(f"--- SECURITY ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to protect the PDF.")
     
-    # 7. Handle Office to PDF Conversion (Word, Excel, PPT)
+# 7. Handle Office to PDF Conversion (Word, Excel, PPT)
 @app.post("/api/convert/to-pdf")
 async def convert_to_pdf(file: UploadFile = File(...)):
     try:
@@ -287,7 +288,7 @@ async def convert_to_word(file: UploadFile = File(...)):
         cv.convert(output_docx)      # all pages by default
         cv.close()
         
-        os.unlink(input_path) # Clean up input
+        os.unlink(input_path) 
 
         base_name = os.path.splitext(file.filename)[0]
         return FileResponse(
@@ -298,7 +299,8 @@ async def convert_to_word(file: UploadFile = File(...)):
     except Exception as e:
         print(f"--- CONVERT TO WORD ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to convert PDF to Word.")
-    # 9. Handle PDF to Excel Conversion (With Smart OCR Router)
+
+# 9. Handle PDF to Excel Conversion (Robust Pipeline with OCR Rescue)
 @app.post("/api/convert/to-excel")
 async def convert_to_excel(file: UploadFile = File(...)):
     try:
@@ -308,69 +310,69 @@ async def convert_to_excel(file: UploadFile = File(...)):
             input_path = temp_in.name
 
         output_xlsx = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx").name
-        working_pdf_path = input_path
-
-        # ==========================================
-        # STEP 1: The "Smart Router" Pre-Flight Check
-        # ==========================================
-        try:
-            reader = PdfReader(input_path)
-            # Sample the first page to see if there is a hidden text layer
-            sample_text = reader.pages[0].extract_text() or ""
-            
-            if len(sample_text.strip()) < 20:
-                print("--- SMART ROUTER: Image detected. Routing to OCR first... ---")
-                ocr_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
-                ocrmypdf.ocr(input_path, ocr_path, force_ocr=True, output_type='pdf')
-                working_pdf_path = ocr_path
-            else:
-                print("--- SMART ROUTER: Native text detected. Skipping OCR... ---")
-        except Exception as e:
-            print(f"Pre-flight check failed, proceeding safely: {str(e)}")
-
-        # ==========================================
-        # STEP 2: Extract Tables
-        # ==========================================
         all_tables = []
-        with pdfplumber.open(working_pdf_path) as pdf:
-            # Use text-alignment strategy to handle borderless tables (like your screenshot)
-            custom_settings = {"vertical_strategy": "text", "horizontal_strategy": "text"}
-            
-            for page in pdf.pages:
-                tables = page.extract_tables(custom_settings)
-                for table in tables:
-                    # Clean empty cells
-                    cleaned_table = [[cell if cell is not None else "" for cell in row] for row in table]
-                    if len(cleaned_table) > 1:
-                        df = pd.DataFrame(cleaned_table[1:])
-                        headers = cleaned_table[0]
-                        
-                        # Pad or truncate headers so pandas doesn't crash on messy data
-                        if len(headers) < len(df.columns):
-                            headers.extend([f"Column_{i}" for i in range(len(headers), len(df.columns))])
-                        elif len(headers) > len(df.columns):
-                            headers = headers[:len(df.columns)]
-                            
-                        df.columns = headers
-                        all_tables.append(df)
 
-        # Cleanup the temporary OCR file if we created one
-        if working_pdf_path != input_path and os.path.exists(working_pdf_path):
-            os.unlink(working_pdf_path)
+        # Strategy 1: Try Camelot (Best for structural accuracy on native PDFs)
+        try:
+            tables = camelot.read_pdf(input_path, pages='all', flavor='stream')
+            for table in tables:
+                if not table.df.empty:
+                    all_tables.append(table.df)
+        except Exception as e:
+            print(f"Camelot Strategy Skipped/Failed: {e}")
 
+        # Strategy 2: Fallback to pdfplumber (If Camelot misses native text)
+        if not all_tables:
+            try:
+                with pdfplumber.open(input_path) as pdf:
+                    for page in pdf.pages:
+                        tables = page.extract_tables({"vertical_strategy": "text", "horizontal_strategy": "text"})
+                        for table in tables:
+                            df = pd.DataFrame(table[1:], columns=table[0])
+                            all_tables.append(df)
+            except Exception as e:
+                print(f"pdfplumber Strategy Failed: {e}")
+
+        # Strategy 3: The OCR Rescue (If the PDF is a flat image/screenshot)
+        if not all_tables:
+            print("--- IMAGE DETECTED: Running OCR Rescue ---")
+            ocr_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+            try:
+                # Force OCR to inject a text layer into the image
+                ocrmypdf.ocr(input_path, ocr_path, force_ocr=True, output_type='pdf', deskew=True)
+                
+                # Extract using the new text layer
+                with pdfplumber.open(ocr_path) as pdf:
+                    # Give OCR text slightly wider tolerances
+                    settings = {
+                        "vertical_strategy": "text", 
+                        "horizontal_strategy": "text",
+                        "snap_tolerance": 5, 
+                        "join_tolerance": 5
+                    }
+                    for page in pdf.pages:
+                        tables = page.extract_tables(settings)
+                        for table in tables:
+                            df = pd.DataFrame(table[1:], columns=table[0])
+                            all_tables.append(df)
+            except Exception as e:
+                print(f"OCR Rescue Failed: {e}")
+            finally:
+                if os.path.exists(ocr_path):
+                    os.unlink(ocr_path)
+
+        # Final check
         if not all_tables:
             os.unlink(input_path)
-            raise HTTPException(status_code=400, detail="No tables found in this document.")
+            raise HTTPException(status_code=400, detail="Could not detect tables, even after OCR.")
 
-        # ==========================================
-        # STEP 3: Package into Excel
-        # ==========================================
+        # Save to Excel
         with pd.ExcelWriter(output_xlsx, engine='openpyxl') as writer:
             for i, df in enumerate(all_tables):
                 df.to_excel(writer, sheet_name=f"Table_{i+1}", index=False)
 
-        os.unlink(input_path) 
-
+        os.unlink(input_path)
+        
         base_name = os.path.splitext(file.filename)[0]
         return FileResponse(
             path=output_xlsx, 
@@ -382,9 +384,9 @@ async def convert_to_excel(file: UploadFile = File(...)):
         raise
     except Exception as e:
         print(f"--- CONVERT TO EXCEL ERROR ---: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to convert PDF to Excel.")
-    
-    # 10. Handle Watermarking
+        raise HTTPException(status_code=500, detail="Failed to convert.")
+
+# 10. Handle Watermarking
 @app.post("/api/watermark")
 async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
     try:
@@ -396,13 +398,12 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
         reader = PdfReader(input_path)
         writer = PdfWriter()
 
-        # Create the watermark PDF in memory (no need to save to disk)
+        # Create the watermark PDF in memory
         packet = io.BytesIO()
         can = canvas.Canvas(packet)
         can.setFont("Helvetica-Bold", 72)
-        can.setFillColorRGB(0.5, 0.5, 0.5, alpha=0.3) # Transparent Gray
+        can.setFillColorRGB(0.5, 0.5, 0.5, alpha=0.3) 
         
-        # Position and rotate the text diagonally
         can.translate(300, 400)
         can.rotate(45)
         can.drawCentredString(0, 0, text)
@@ -411,7 +412,6 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
         packet.seek(0)
         watermark = PdfReader(packet)
 
-        # Stamp the watermark onto every page
         for page in reader.pages:
             page.merge_page(watermark.pages[0])
             writer.add_page(page)
@@ -439,11 +439,9 @@ async def scrub_metadata(file: UploadFile = File(...)):
         reader = PdfReader(input_path)
         writer = PdfWriter()
 
-        # Copy all pages
         for page in reader.pages:
             writer.add_page(page)
 
-        # Overwrite the metadata dictionary with an empty set
         writer.add_metadata({})
 
         output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
