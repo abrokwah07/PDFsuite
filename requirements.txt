@@ -8,10 +8,6 @@ pdf2docx
 pdfplumber
 pandas
 openpyxl
-<<<<<<< HEAD
 reportlab
 camelot-py[cv]
 lxml
-=======
-reportlab
->>>>>>> 6f6350e1f1cb5a94eb206b4f7948453a820757b9
