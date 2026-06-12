@@ -4,6 +4,8 @@ from pypdf import PdfWriter, PdfReader
 from pypdf.constants import UserAccessPermissions
 from pdf2docx import Converter
 from reportlab.pdfgen import canvas
+from fastapi.responses import JSONResponse
+import base64
 import os
 import tempfile
 import subprocess
@@ -429,6 +431,49 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
     except Exception as e:
         print(f"--- WATERMARK ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to add watermark.")
+    
+    from fastapi.responses import JSONResponse
+import base64
+
+# 10.5 Handle Document Preview (First Page Thumbnail)
+@app.post("/api/preview")
+async def preview_pdf(file: UploadFile = File(...)):
+    try:
+        # Save the uploaded file temporarily
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        # Use our stable pdfplumber to open the PDF
+        with pdfplumber.open(input_path) as pdf:
+            # Grab the first page
+            first_page = pdf.pages[0]
+            
+            # Render it as an image (resolution=72 is standard web quality, fast to generate)
+            img = first_page.to_image(resolution=72)
+            
+            # Save the image to a memory buffer as a JPEG
+            buffer = io.BytesIO()
+            img.original.save(buffer, format="JPEG")
+            img_bytes = buffer.getvalue()
+            
+            # Convert the image to a base64 string so the frontend can display it easily
+            base64_encoded = base64.b64encode(img_bytes).decode('utf-8')
+            img_data_url = f"data:image/jpeg;base64,{base64_encoded}"
+
+        os.unlink(input_path)
+        
+        # Return the image URL and some basic metadata
+        return JSONResponse(content={
+            "filename": file.filename,
+            "total_pages": len(pdf.pages),
+            "preview_image": img_data_url
+        })
+
+    except Exception as e:
+        print(f"--- PREVIEW ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate preview.")
 
 # 11. Handle Metadata Scrubbing
 @app.post("/api/scrub")
