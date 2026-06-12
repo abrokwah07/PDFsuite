@@ -12,7 +12,10 @@ import zipfile
 import pdfplumber
 import pandas as pd
 import io
+<<<<<<< HEAD
 import camelot
+=======
+>>>>>>> 6f6350e1f1cb5a94eb206b4f7948453a820757b9
 
 app = FastAPI()
 
@@ -299,8 +302,12 @@ async def convert_to_word(file: UploadFile = File(...)):
     except Exception as e:
         print(f"--- CONVERT TO WORD ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to convert PDF to Word.")
+<<<<<<< HEAD
 
 # 9. Handle PDF to Excel Conversion (Robust Pipeline with OCR Rescue)
+=======
+    # 9. Handle PDF to Excel Conversion (Extract Tables)
+>>>>>>> 6f6350e1f1cb5a94eb206b4f7948453a820757b9
 @app.post("/api/convert/to-excel")
 async def convert_to_excel(file: UploadFile = File(...)):
     try:
@@ -310,6 +317,7 @@ async def convert_to_excel(file: UploadFile = File(...)):
             input_path = temp_in.name
 
         output_xlsx = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx").name
+<<<<<<< HEAD
         all_tables = []
 
         # Strategy 1: Try Camelot (Best for structural accuracy on native PDFs)
@@ -367,18 +375,41 @@ async def convert_to_excel(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Could not detect tables, even after OCR.")
 
         # Save to Excel
+=======
+
+        # Extract tables using pdfplumber and save via pandas
+        with pdfplumber.open(input_path) as pdf:
+            all_tables = []
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                for table in tables:
+                    df = pd.DataFrame(table[1:], columns=table[0])
+                    all_tables.append(df)
+
+        if not all_tables:
+            os.unlink(input_path)
+            raise HTTPException(status_code=400, detail="No tables found in this PDF.")
+
+        # Write all found tables into separate sheets in the Excel file
+>>>>>>> 6f6350e1f1cb5a94eb206b4f7948453a820757b9
         with pd.ExcelWriter(output_xlsx, engine='openpyxl') as writer:
             for i, df in enumerate(all_tables):
                 df.to_excel(writer, sheet_name=f"Table_{i+1}", index=False)
 
+<<<<<<< HEAD
         os.unlink(input_path)
         
+=======
+        os.unlink(input_path) 
+
+>>>>>>> 6f6350e1f1cb5a94eb206b4f7948453a820757b9
         base_name = os.path.splitext(file.filename)[0]
         return FileResponse(
             path=output_xlsx, 
             filename=f"{base_name}.xlsx", 
             media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+<<<<<<< HEAD
         
     except HTTPException:
         raise
@@ -387,6 +418,13 @@ async def convert_to_excel(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Failed to convert.")
 
 # 10. Handle Watermarking
+=======
+    except Exception as e:
+        print(f"--- CONVERT TO EXCEL ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to convert PDF to Excel.")
+    
+    # 10. Handle Watermarking
+>>>>>>> 6f6350e1f1cb5a94eb206b4f7948453a820757b9
 @app.post("/api/watermark")
 async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
     try:
@@ -398,12 +436,22 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
         reader = PdfReader(input_path)
         writer = PdfWriter()
 
+<<<<<<< HEAD
         # Create the watermark PDF in memory
         packet = io.BytesIO()
         can = canvas.Canvas(packet)
         can.setFont("Helvetica-Bold", 72)
         can.setFillColorRGB(0.5, 0.5, 0.5, alpha=0.3) 
         
+=======
+        # Create the watermark PDF in memory (no need to save to disk)
+        packet = io.BytesIO()
+        can = canvas.Canvas(packet)
+        can.setFont("Helvetica-Bold", 72)
+        can.setFillColorRGB(0.5, 0.5, 0.5, alpha=0.3) # Transparent Gray
+        
+        # Position and rotate the text diagonally
+>>>>>>> 6f6350e1f1cb5a94eb206b4f7948453a820757b9
         can.translate(300, 400)
         can.rotate(45)
         can.drawCentredString(0, 0, text)
@@ -412,6 +460,10 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
         packet.seek(0)
         watermark = PdfReader(packet)
 
+<<<<<<< HEAD
+=======
+        # Stamp the watermark onto every page
+>>>>>>> 6f6350e1f1cb5a94eb206b4f7948453a820757b9
         for page in reader.pages:
             page.merge_page(watermark.pages[0])
             writer.add_page(page)
@@ -439,9 +491,17 @@ async def scrub_metadata(file: UploadFile = File(...)):
         reader = PdfReader(input_path)
         writer = PdfWriter()
 
+<<<<<<< HEAD
         for page in reader.pages:
             writer.add_page(page)
 
+=======
+        # Copy all pages
+        for page in reader.pages:
+            writer.add_page(page)
+
+        # Overwrite the metadata dictionary with an empty set
+>>>>>>> 6f6350e1f1cb5a94eb206b4f7948453a820757b9
         writer.add_metadata({})
 
         output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
