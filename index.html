@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local PDF Suite</title>
     <script src="https://cdn.tailwindcss.com"></script>
-
     <script>
         tailwind.config = { darkMode: 'class' }
     </script>
-
     <style>
         @keyframes pulse-border {
             0% { border-color: #e5e7eb; }
@@ -23,232 +21,269 @@
             100% { border-color: #334155; }
         }
         .processing { animation: pulse-border 2s infinite; pointer-events: none; opacity: 0.7; }
+        
+        /* Hide scrollbar for a cleaner app feel */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
     </style>
 </head>
 
-<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans min-h-screen flex flex-col transition-colors duration-300">
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans h-screen flex overflow-hidden transition-colors duration-300">
 
-    <nav class="bg-white dark:bg-slate-950 shadow-sm border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 transition-colors duration-300">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+    <aside class="w-72 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col z-20 transition-colors duration-300">
+        <div class="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800">
             <div class="flex items-center space-x-3">
-                <div class="bg-blue-600 text-white p-2 rounded-lg shadow-sm">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <div class="bg-blue-600 text-white p-1.5 rounded-lg shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 </div>
-                <h1 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">PDF<span class="text-blue-600 dark:text-blue-500">Suite</span></h1>
+                <h1 class="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">PDF<span class="text-blue-600 dark:text-blue-500">Suite</span></h1>
             </div>
             
-            <div class="flex items-center space-x-6">
-                <div class="text-sm font-medium text-slate-500 dark:text-slate-400 hidden sm:block">Local & Secure</div>
-                <button id="theme-toggle" type="button" class="text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none rounded-lg text-sm p-2.5 transition-colors">
-                    <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
-                    <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"></path></svg>
-                </button>
-            </div>
+            <button id="theme-toggle" type="button" class="text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-sm p-1.5 transition-colors">
+                <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"></path></svg>
+            </button>
         </div>
-    </nav>
 
-    <main class="flex-grow max-w-7xl mx-auto w-full mt-8 px-4 sm:px-6 lg:px-8 mb-12">
+        <div class="flex-grow overflow-y-auto py-4 px-3 space-y-1" id="nav-menu">
+            <div class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3 mt-2">Conversion</div>
+            
+            <button onclick="switchTool('excel')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400 active-tool" data-target="tool-excel">
+                <div class="text-emerald-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></div>
+                <span>PDF to Excel</span>
+            </button>
+            <button onclick="switchTool('word')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-word">
+                <div class="text-teal-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></div>
+                <span>PDF to Word</span>
+            </button>
+            <button onclick="switchTool('office')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-office">
+                <div class="text-indigo-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>
+                <span>Office to PDF</span>
+            </button>
+
+            <div class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Organization</div>
+
+            <button onclick="switchTool('manipulate')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-manipulate">
+                <div class="text-pink-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></div>
+                <span>Organize & Rotate</span>
+            </button>
+            <button onclick="switchTool('merge')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-merge">
+                <div class="text-blue-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg></div>
+                <span>Merge PDFs</span>
+            </button>
+            <button onclick="switchTool('split')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-split">
+                <div class="text-purple-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"></path></svg></div>
+                <span>Extract Pages</span>
+            </button>
+            <button onclick="switchTool('compress')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-compress">
+                <div class="text-green-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></div>
+                <span>Compress PDF</span>
+            </button>
+
+            <div class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Security & Edits</div>
+
+            <button onclick="switchTool('protect')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-protect">
+                <div class="text-red-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg></div>
+                <span>Protect & Restrict</span>
+            </button>
+            <button onclick="switchTool('watermark')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-watermark">
+                <div class="text-orange-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg></div>
+                <span>Watermark</span>
+            </button>
+            <button onclick="switchTool('scrub')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-scrub">
+                <div class="text-gray-500 dark:text-gray-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></div>
+                <span>Scrub Metadata</span>
+            </button>
+            <button onclick="switchTool('ocr')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-ocr">
+                <div class="text-yellow-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></div>
+                <span>Searchable PDF (OCR)</span>
+            </button>
+        </div>
+    </aside>
+
+    <section class="w-96 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 transition-colors duration-300 shadow-xl overflow-y-auto">
+        <div class="p-8 h-full flex flex-col" id="tools-container">
+
+            <div id="tool-excel" class="tool-section block h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF to Excel</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Extract tables automatically using structural analysis and OCR fallback.</p>
+                <div class="mb-6 flex-grow">
+                    <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Upload Document</label>
+                    <input type="file" id="to-excel-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-lg p-1 transition-colors" onchange="triggerPreview(this)">
+                </div>
+                <button id="to-excel-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 dark:hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm" disabled>Convert to Excel</button>
+            </div>
+
+            <div id="tool-word" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF to Word</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Extract text and layout from a PDF into an editable Word document.</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="to-word-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 dark:file:bg-teal-900/20 file:text-teal-700 dark:file:text-teal-400 hover:file:bg-teal-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerPreview(this)">
+                </div>
+                <button id="to-word-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-teal-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to Word</button>
+            </div>
+
+            <div id="tool-office" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Office to PDF</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Convert Word, Excel, or PowerPoint files into PDF documents.</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="to-pdf-input" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/20 file:text-indigo-700 dark:file:text-indigo-400 hover:file:bg-indigo-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
+                </div>
+                <button id="to-pdf-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-indigo-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to PDF</button>
+            </div>
+
+            <div id="tool-manipulate" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Organize Pages</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Visually rotate or delete pages using the preview grid on the right.</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="manipulate-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-50 dark:file:bg-pink-900/20 file:text-pink-700 dark:file:text-pink-400 hover:file:bg-pink-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300">
+                        <strong class="block mb-2 text-slate-800 dark:text-white">How to use:</strong>
+                        1. Upload a file above.<br>
+                        2. Use the buttons on the preview thumbnails to rotate (↻) or delete (🗑️) pages.<br>
+                        3. Click "Apply Changes" below.
+                    </div>
+                </div>
+                <button id="manipulate-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-pink-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Apply Changes</button>
+            </div>
+
+            <div id="tool-merge" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Merge PDFs</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Combine multiple PDF files into a single document.</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="merge-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerPreview(this)">
+                    <div id="merge-list" class="text-xs text-slate-500 dark:text-slate-400 mt-2 truncate hidden"></div>
+                </div>
+                <button id="merge-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Merge Files</button>
+            </div>
+
+            <div id="tool-split" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Extract Pages</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Pull specific pages out into a new document.</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="split-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 dark:file:bg-purple-900/20 file:text-purple-700 dark:file:text-purple-400 hover:file:bg-purple-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Pages to Extract</label>
+                    <input type="text" id="pages-input" placeholder="e.g., 1, 3, 5-7" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500 transition-colors">
+                </div>
+                <button id="split-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-purple-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Extract Pages</button>
+            </div>
+
+            <div id="tool-compress" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Compress PDF</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Reduce the file size of your document significantly.</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="compress-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 dark:file:bg-green-900/20 file:text-green-700 dark:file:text-green-400 hover:file:bg-green-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerPreview(this)">
+                </div>
+                <button id="compress-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Compress File</button>
+            </div>
+
+            <div id="tool-protect" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Protect & Restrict</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Add passwords and restrict editing, printing, or copying.</p>
+                <div class="mb-4 flex-grow overflow-y-auto pr-2">
+                    <input type="file" id="protect-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-50 dark:file:bg-red-900/20 file:text-red-700 dark:file:text-red-400 hover:file:bg-red-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <div class="space-y-3">
+                        <input type="password" id="open-password" placeholder="Open Password (Optional)" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-red-500">
+                        <input type="password" id="owner-password" placeholder="Owner Password (Req. for locks)" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-red-500">
+                    </div>
+                    <div class="mt-4 bg-slate-50 dark:bg-slate-800 rounded-lg p-4 border border-slate-100 dark:border-slate-700">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">Lock Features</span>
+                        <label class="flex items-center space-x-3 text-sm text-slate-700 dark:text-slate-300 mb-2 cursor-pointer">
+                            <input type="checkbox" id="disable-print" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Printing</span>
+                        </label>
+                        <label class="flex items-center space-x-3 text-sm text-slate-700 dark:text-slate-300 mb-2 cursor-pointer">
+                            <input type="checkbox" id="disable-copy" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Copying</span>
+                        </label>
+                        <label class="flex items-center space-x-3 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <input type="checkbox" id="disable-modify" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Editing</span>
+                        </label>
+                    </div>
+                </div>
+                <button id="protect-btn" class="w-full mt-4 bg-slate-900 dark:bg-slate-800 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Secure PDF</button>
+            </div>
+
+            <div id="tool-watermark" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Watermark</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Stamp text diagonally across every page.</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="watermark-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 dark:file:bg-orange-900/20 file:text-orange-700 dark:file:text-orange-400 hover:file:bg-orange-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Watermark Text</label>
+                    <input type="text" id="watermark-text" placeholder="e.g., CONFIDENTIAL" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500">
+                </div>
+                <button id="watermark-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-orange-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Apply Watermark</button>
+            </div>
+
+            <div id="tool-scrub" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Scrub Metadata</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Remove hidden tracking data (Author, Date, Software).</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="scrub-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerPreview(this)">
+                </div>
+                <button id="scrub-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Clean PDF</button>
+            </div>
+
+            <div id="tool-ocr" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Searchable PDF (OCR)</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Use AI to read scanned documents and make text selectable.</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="ocr-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 dark:file:bg-yellow-900/20 file:text-yellow-700 dark:file:text-yellow-400 hover:file:bg-yellow-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <div id="ocr-warning" class="hidden flex p-4 mb-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-300" role="alert">
+                      <svg class="flex-shrink-0 inline w-4 h-4 me-3 mt-[2px]" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20"><path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/></svg>
+                      <div><span class="font-medium">Note:</span> This AI process is intensive and may take a few minutes depending on file size.</div>
+                    </div>
+                </div>
+                <button id="ocr-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-yellow-500 hover:text-slate-900 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Run OCR Scan</button>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="flex-grow bg-slate-100/50 dark:bg-slate-950/50 flex flex-col items-center justify-center p-8 relative overflow-hidden transition-colors duration-300">
         
-        <div class="mb-8">
-            <h2 class="text-3xl font-bold text-slate-900 dark:text-white">Workspace</h2>
-            <p class="text-slate-500 dark:text-slate-400 mt-1">All processing happens locally on your machine. Your files are safe.</p>
+        <div id="preview-empty" class="text-center transition-opacity duration-300">
+            <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white dark:bg-slate-800 shadow-sm mb-6 text-slate-300 dark:text-slate-600">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Live Preview</h3>
+            <p class="text-slate-500 dark:text-slate-500 max-w-sm mx-auto">Upload a document to view its contents before processing.</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 align-top">
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Merge PDFs</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex-grow">Combine multiple PDF files into a single document.</p>
-                
-                <input type="file" id="merge-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 mb-3">
-                <div id="merge-list" class="text-xs text-slate-500 dark:text-slate-400 mb-3 truncate hidden"></div>
-                
-                <button id="merge-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-blue-600 dark:hover:bg-blue-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Merge Files
-                </button>
-            </div>
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Compress PDF</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex-grow">Reduce the file size of your document significantly.</p>
-                
-                <input type="file" id="compress-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 dark:file:bg-green-900/20 file:text-green-700 dark:file:text-green-400 hover:file:bg-green-100 mb-3">
-                
-                <button id="compress-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-green-600 dark:hover:bg-green-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Compress File
-                </button>
-            </div>
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Extract Pages</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex-grow">Pull specific pages out into a new document.</p>
-                
-                <input type="file" id="split-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 dark:file:bg-purple-900/20 file:text-purple-700 dark:file:text-purple-400 hover:file:bg-purple-100 mb-3">
-                <input type="text" id="pages-input" placeholder="Pages (e.g., 1, 3, 5-7)" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-purple-500 transition-colors">
-                
-                <button id="split-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-purple-600 dark:hover:bg-purple-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Extract Pages
-                </button>
-            </div>
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Searchable PDF (OCR)</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex-grow">Use AI to read scanned documents and make text selectable.</p>
-                
-                <input type="file" id="ocr-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 dark:file:bg-yellow-900/20 file:text-yellow-700 dark:file:text-yellow-400 hover:file:bg-yellow-100 mb-3">
-                <p id="ocr-warning" class="text-xs text-yellow-600 dark:text-yellow-500 font-medium mb-3 hidden">This process is intensive and may take a few minutes.</p>
-                
-                <button id="ocr-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-yellow-500 hover:text-slate-900 dark:hover:bg-yellow-500 dark:hover:text-slate-900 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Run OCR Scan
-                </button>
-            </div>
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Office to PDF</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex-grow">Convert Word, Excel, or PowerPoint files into PDF documents.</p>
-                
-                <input type="file" id="to-pdf-input" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/20 file:text-indigo-700 dark:file:text-indigo-400 hover:file:bg-indigo-100 mb-3">
-                
-                <button id="to-pdf-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-indigo-600 dark:hover:bg-indigo-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Convert to PDF
-                </button>
-            </div>
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">PDF to Word</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex-grow">Extract text and layout from a PDF into an editable Word document.</p>
-                
-                <input type="file" id="to-word-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-teal-50 dark:file:bg-teal-900/20 file:text-teal-700 dark:file:text-teal-400 hover:file:bg-teal-100 mb-3">
-                
-                <button id="to-word-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-teal-600 dark:hover:bg-teal-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Convert to Word
-                </button>
-            </div>
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow lg:col-span-1">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">PDF to Excel</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex-grow">Extract tables from a PDF into an editable Excel sheet.</p>
-                
-                <input type="file" id="to-excel-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 mb-3">
-                
-                <button id="to-excel-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 dark:hover:bg-emerald-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Convert to Excel
-                </button>
-            </div>
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow lg:col-span-2">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Protect & Restrict</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Add passwords and restrict editing, printing, or copying.</p>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <input type="file" id="protect-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-red-50 dark:file:bg-red-900/20 file:text-red-700 dark:file:text-red-400 hover:file:bg-red-100 mb-3">
-                        <input type="password" id="open-password" placeholder="Open Password (Optional)" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-red-500 transition-colors">
-                        <input type="password" id="owner-password" placeholder="Owner Password (Req. for locks)" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-red-500 transition-colors">
-                    </div>
-                    <div class="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
-                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">Lock Features</span>
-                        <label class="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-300 mb-2">
-                            <input type="checkbox" id="disable-print" class="rounded border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-red-600 focus:ring-red-500"><span>Disable Printing</span>
-                        </label>
-                        <label class="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-300 mb-2">
-                            <input type="checkbox" id="disable-copy" class="rounded border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-red-600 focus:ring-red-500"><span>Disable Copying</span>
-                        </label>
-                        <label class="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-300">
-                            <input type="checkbox" id="disable-modify" class="rounded border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-red-600 focus:ring-red-500"><span>Disable Editing</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <button id="protect-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-red-600 dark:hover:bg-red-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Secure PDF
-                </button>
-            </div>
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Add Watermark</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex-grow">Stamp text diagonally across every page of your PDF.</p>
-                
-                <input type="file" id="watermark-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-orange-50 dark:file:bg-orange-900/20 file:text-orange-700 dark:file:text-orange-400 hover:file:bg-orange-100 mb-3">
-                <input type="text" id="watermark-text" placeholder="e.g., CONFIDENTIAL" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-orange-500 transition-colors">
-                
-                <button id="watermark-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-orange-600 dark:hover:bg-orange-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Apply Watermark
-                </button>
-            </div>
-
-            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col hover:shadow-md transition-shadow">
-                <div class="flex items-center mb-4 space-x-3">
-                    <div class="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 p-2 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Scrub Metadata</h3>
-                </div>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex-grow">Remove hidden tracking data (Author, Date, Software) from the file.</p>
-                
-                <input type="file" id="scrub-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 mb-3">
-                
-                <button id="scrub-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-gray-600 dark:hover:bg-gray-600 text-white font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-auto" disabled>
-                    Clean PDF
-                </button>
-            </div>
-
+        <div id="preview-loading" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-slate-100/80 dark:bg-slate-950/80 backdrop-blur-sm z-10 transition-opacity duration-300">
+            <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="text-slate-600 dark:text-slate-300 font-medium">Generating preview...</p>
         </div>
-    </main>
+
+        <div id="preview-active" class="hidden flex-col items-center w-full h-full max-h-full">
+            <div class="bg-white dark:bg-slate-800 py-3 px-6 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 mb-6 flex items-center space-x-4 shrink-0">
+                <span id="preview-filename" class="text-sm font-bold text-slate-700 dark:text-slate-200 truncate max-w-[200px]">document.pdf</span>
+                <div class="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
+                <span id="preview-pages" class="text-sm text-slate-500 dark:text-slate-400">0 pages</span>
+            </div>
+            
+            <div id="preview-limit-warning" class="hidden text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full mb-4 shrink-0">Showing first 30 pages for performance</div>
+            
+            <div id="preview-single" class="flex-grow w-full flex justify-center items-start overflow-y-auto pb-8">
+                <img id="preview-image" src="" alt="PDF Preview" class="max-w-full lg:max-w-3xl bg-white shadow-2xl border border-slate-200 dark:border-slate-700 rounded-sm">
+            </div>
+
+            <div id="preview-grid" class="hidden flex-grow w-full overflow-y-auto pb-8 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 content-start px-4">
+                </div>
+        </div>
+    </section>
 
     <script>
+        // --- GLOBAL STATE ---
+        let currentActiveTool = 'excel';
+        let loadedPreviewImages = [];
+        let pageMods = { rotations: {}, deletions: [] };
 
-        // --- DARK MODE LOGIC ---
+        // --- THEME TOGGLE LOGIC ---
         const themeToggleBtn = document.getElementById('theme-toggle');
         const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
         const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
 
-        // Check local storage for theme preference
         if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
             themeToggleLightIcon.classList.remove('hidden');
@@ -258,11 +293,8 @@
         }
 
         themeToggleBtn.addEventListener('click', function() {
-            // Toggle icons inside button
             themeToggleDarkIcon.classList.toggle('hidden');
             themeToggleLightIcon.classList.toggle('hidden');
-
-            // If set via local storage previously
             if (localStorage.getItem('color-theme')) {
                 if (localStorage.getItem('color-theme') === 'light') {
                     document.documentElement.classList.add('dark');
@@ -272,7 +304,6 @@
                     localStorage.setItem('color-theme', 'light');
                 }
             } else {
-                // If NOT set via local storage previously
                 if (document.documentElement.classList.contains('dark')) {
                     document.documentElement.classList.remove('dark');
                     localStorage.setItem('color-theme', 'light');
@@ -283,7 +314,199 @@
             }
         });
 
-        // Helper function to handle API calls universally
+        // --- SIDEBAR SWITCHING LOGIC ---
+        function switchTool(toolName) {
+            currentActiveTool = toolName;
+            
+            // Reset Sidebar Styling
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-100', 'dark:bg-slate-800/50', 'active-tool');
+                const iconDiv = btn.querySelector('div');
+                if(iconDiv) {
+                    const colorClass = Array.from(iconDiv.classList).find(c => c.startsWith('text-'));
+                    if(colorClass) btn.classList.remove(colorClass.replace('text-', 'bg-').replace('-500', '-50'), 'dark:bg-transparent');
+                }
+            });
+
+            // Set Active Sidebar Style
+            const activeBtn = document.querySelector(`[data-target="tool-${toolName}"]`);
+            activeBtn.classList.add('bg-slate-100', 'dark:bg-slate-800/50', 'active-tool');
+
+            // Hide all tools, show target
+            document.querySelectorAll('.tool-section').forEach(sec => {
+                sec.classList.remove('block');
+                sec.classList.add('hidden');
+            });
+            document.getElementById(`tool-${toolName}`).classList.remove('hidden');
+            document.getElementById(`tool-${toolName}`).classList.add('block');
+            
+            // Toggle preview views dynamically
+            if (document.getElementById('preview-active').classList.contains('flex')) {
+                if (toolName === 'manipulate') {
+                    document.getElementById('preview-single').classList.add('hidden');
+                    document.getElementById('preview-single').classList.remove('flex');
+                    document.getElementById('preview-grid').classList.remove('hidden');
+                    document.getElementById('preview-grid').classList.add('grid');
+                    renderPreviewGrid();
+                } else {
+                    document.getElementById('preview-grid').classList.add('hidden');
+                    document.getElementById('preview-grid').classList.remove('grid');
+                    document.getElementById('preview-single').classList.remove('hidden');
+                    document.getElementById('preview-single').classList.add('flex');
+                }
+            } else {
+                resetPreview();
+            }
+        }
+
+        // --- LIVE PREVIEW LOGIC ---
+        async function triggerPreview(inputElement) {
+            if (!inputElement.files || inputElement.files.length === 0) {
+                resetPreview();
+                return;
+            }
+
+            document.getElementById('preview-empty').classList.add('hidden');
+            document.getElementById('preview-active').classList.add('hidden');
+            document.getElementById('preview-loading').classList.remove('hidden');
+
+            const file = inputElement.files[0];
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                if (!file.name.toLowerCase().endsWith('.pdf')) {
+                    showPreviewWithoutImage(file.name, "Office Document");
+                    return;
+                }
+
+                const response = await fetch("/api/preview", { method: "POST", body: formData });
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    document.getElementById('preview-filename').innerText = data.filename;
+                    document.getElementById('preview-pages').innerText = `${data.total_pages} page(s)`;
+                    
+                    if(data.limited) document.getElementById('preview-limit-warning').classList.remove('hidden');
+                    else document.getElementById('preview-limit-warning').classList.add('hidden');
+
+                    // Store images globally
+                    loadedPreviewImages = data.preview_images || [];
+                    pageMods = { rotations: {}, deletions: [] };
+
+                    // Display single image fallback
+                    if (loadedPreviewImages.length > 0) {
+                        document.getElementById('preview-image').src = loadedPreviewImages[0];
+                    }
+
+                    // Render Grid if on manipulate tool
+                    if (currentActiveTool === 'manipulate') {
+                        document.getElementById('preview-single').classList.add('hidden');
+                        document.getElementById('preview-single').classList.remove('flex');
+                        document.getElementById('preview-grid').classList.remove('hidden');
+                        document.getElementById('preview-grid').classList.add('grid');
+                        renderPreviewGrid();
+                        document.getElementById('manipulate-btn').disabled = false;
+                    } else {
+                        document.getElementById('preview-grid').classList.add('hidden');
+                        document.getElementById('preview-grid').classList.remove('grid');
+                        document.getElementById('preview-single').classList.remove('hidden');
+                        document.getElementById('preview-single').classList.add('flex');
+                    }
+
+                    document.getElementById('preview-loading').classList.add('hidden');
+                    document.getElementById('preview-active').classList.remove('hidden');
+                    document.getElementById('preview-active').classList.add('flex');
+                } else {
+                    resetPreview();
+                }
+            } catch (error) {
+                console.error("Preview failed:", error);
+                resetPreview();
+            }
+        }
+
+        function renderPreviewGrid() {
+            const grid = document.getElementById('preview-grid');
+            grid.innerHTML = '';
+            
+            const isManipulateTool = (currentActiveTool === 'manipulate');
+
+            loadedPreviewImages.forEach((imgSrc, index) => {
+                const rotation = pageMods.rotations[index] || 0;
+                const isDeleted = pageMods.deletions.includes(index);
+                
+                const card = document.createElement('div');
+                card.className = `relative flex flex-col items-center transition-all ${isDeleted ? 'opacity-30 grayscale' : ''}`;
+                
+                const img = document.createElement('img');
+                img.src = imgSrc;
+                img.className = 'w-full shadow-md border border-slate-200 dark:border-slate-700 rounded bg-white transition-transform duration-300';
+                img.style.transform = `rotate(${rotation}deg)`;
+                
+                const pageNum = document.createElement('div');
+                pageNum.className = 'mt-2 text-xs font-semibold text-slate-500';
+                pageNum.innerText = `Page ${index + 1}`;
+
+                card.appendChild(img);
+                card.appendChild(pageNum);
+
+                if (isManipulateTool) {
+                    const controls = document.createElement('div');
+                    controls.className = 'absolute top-2 right-2 flex space-x-1 opacity-0 transition-opacity bg-white/90 p-1 rounded shadow';
+                    
+                    const rotBtn = document.createElement('button');
+                    rotBtn.innerHTML = '↻';
+                    rotBtn.className = 'w-8 h-8 flex items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-slate-700';
+                    rotBtn.onclick = () => {
+                        pageMods.rotations[index] = (pageMods.rotations[index] || 0) + 90;
+                        renderPreviewGrid();
+                    };
+                    
+                    const delBtn = document.createElement('button');
+                    delBtn.innerHTML = isDeleted ? '↩️' : '🗑️';
+                    delBtn.className = 'w-8 h-8 flex items-center justify-center rounded bg-red-100 hover:bg-red-200 text-red-600';
+                    delBtn.onclick = () => {
+                        if (isDeleted) pageMods.deletions = pageMods.deletions.filter(i => i !== index);
+                        else pageMods.deletions.push(index);
+                        renderPreviewGrid();
+                    };
+
+                    controls.appendChild(rotBtn);
+                    controls.appendChild(delBtn);
+                    card.appendChild(controls);
+                    
+                    card.classList.add('group');
+                    controls.classList.add('group-hover:opacity-100');
+                }
+
+                grid.appendChild(card);
+            });
+        }
+
+        function showPreviewWithoutImage(filename, type) {
+            document.getElementById('preview-loading').classList.add('hidden');
+            document.getElementById('preview-filename').innerText = filename;
+            document.getElementById('preview-pages').innerText = type;
+            document.getElementById('preview-image').src = ""; 
+            document.getElementById('preview-active').classList.remove('hidden');
+            document.getElementById('preview-active').classList.add('flex');
+            document.getElementById('preview-single').classList.add('flex');
+            document.getElementById('preview-single').classList.remove('hidden');
+            document.getElementById('preview-grid').classList.add('hidden');
+            document.getElementById('preview-grid').classList.remove('grid');
+        }
+
+        function resetPreview() {
+            document.getElementById('preview-loading').classList.add('hidden');
+            document.getElementById('preview-active').classList.add('hidden');
+            document.getElementById('preview-active').classList.remove('flex');
+            document.getElementById('preview-empty').classList.remove('hidden');
+            loadedPreviewImages = [];
+            pageMods = { rotations: {}, deletions: [] };
+        }
+
+        // --- GENERIC PROCESSING ENGINE ---
         async function processFile(url, formData, btnElement, defaultText, processingText, fileNamePrefix, fileName) {
             const originalContainer = btnElement.parentElement;
             btnElement.textContent = processingText;
@@ -299,7 +522,6 @@
                     a.style.display = 'none';
                     a.href = downloadUrl;
                     
-                    // NEW: Check if the server sent a ZIP or a standard file
                     const contentType = response.headers.get('Content-Type');
                     if (contentType === 'application/zip') {
                         a.download = `${fileNamePrefix}_batch.zip`;
@@ -319,101 +541,92 @@
             } finally {
                 btnElement.textContent = defaultText;
                 originalContainer.classList.remove('processing');
-                // We do not re-enable the button here, let the input listeners handle validation
             }
         }
 
-        // --- 1. MERGE LOGIC ---
+        // --- TOOL EVENT LISTENERS ---
+
+        // MANIPULATE LOGIC
+        const manipulateInput = document.getElementById('manipulate-input');
+        const manipulateBtn = document.getElementById('manipulate-btn');
+        manipulateBtn.addEventListener('click', async () => {
+            const file = manipulateInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('modifications', JSON.stringify(pageMods));
+            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+            await processFile('/api/modify-pages', formData, manipulateBtn, 'Apply Changes', 'Rebuilding...', baseName, 'organized.pdf');
+            manipulateInput.value = ''; manipulateBtn.disabled = true; resetPreview();
+        });
+        
+        // 1. MERGE
         const mergeInput = document.getElementById('merge-input');
         const mergeBtn = document.getElementById('merge-btn');
         const mergeList = document.getElementById('merge-list');
-        
         mergeInput.addEventListener('change', (e) => {
-            const fileCount = e.target.files.length;
-            if (fileCount > 1) {
+            if (e.target.files.length > 1) {
                 mergeBtn.disabled = false;
-                mergeList.textContent = `${fileCount} files selected`;
+                mergeList.textContent = `${e.target.files.length} files selected`;
                 mergeList.classList.remove('hidden');
             } else {
                 mergeBtn.disabled = true;
                 mergeList.classList.add('hidden');
             }
         });
-
         mergeBtn.addEventListener('click', async () => {
             const formData = new FormData();
             Array.from(mergeInput.files).forEach(file => formData.append('files', file));
             await processFile('/api/merge', formData, mergeBtn, 'Merge Files', 'Merging...', 'merged', 'document.pdf');
-            mergeInput.value = ''; // Reset
-            mergeBtn.disabled = true;
-            mergeList.classList.add('hidden');
+            mergeInput.value = ''; mergeBtn.disabled = true; mergeList.classList.add('hidden'); resetPreview();
         });
 
-        // --- 2. COMPRESS LOGIC (Upgraded for Batch) ---
+        // 2. COMPRESS
         const compressInput = document.getElementById('compress-input');
         const compressBtn = document.getElementById('compress-btn');
-        
         compressInput.addEventListener('change', (e) => { compressBtn.disabled = e.target.files.length === 0; });
-        
         compressBtn.addEventListener('click', async () => {
             const formData = new FormData();
-            
-            // NEW: Loop through all selected files and append them to formData
-            Array.from(compressInput.files).forEach(file => {
-                formData.append('files', file); // Notice this matches 'files' in main.py
-            });
-            
-            // We pass the name of the first file as a fallback
+            Array.from(compressInput.files).forEach(file => formData.append('files', file));
             const firstFileName = compressInput.files[0].name;
-            const fileCount = compressInput.files.length;
-            const btnText = fileCount > 1 ? `Compressing ${fileCount} files...` : 'Compressing...';
-            
-            await processFile('/api/compress', formData, compressBtn, 'Compress File(s)', btnText, 'compressed', firstFileName);
-            compressInput.value = '';
-            compressBtn.disabled = true;
+            const btnText = compressInput.files.length > 1 ? `Compressing ${compressInput.files.length} files...` : 'Compressing...';
+            await processFile('/api/compress', formData, compressBtn, 'Compress File', btnText, 'compressed', firstFileName);
+            compressInput.value = ''; compressBtn.disabled = true; resetPreview();
         });
 
-        // --- 3. EXTRACT LOGIC ---
+        // 3. EXTRACT
         const splitInput = document.getElementById('split-input');
         const pagesInput = document.getElementById('pages-input');
         const splitBtn = document.getElementById('split-btn');
-
         function checkSplit() { splitBtn.disabled = !(splitInput.files.length > 0 && pagesInput.value.trim() !== ''); }
         splitInput.addEventListener('change', checkSplit);
         pagesInput.addEventListener('input', checkSplit);
-
         splitBtn.addEventListener('click', async () => {
             const file = splitInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
             formData.append('pages', pagesInput.value);
             await processFile('/api/split', formData, splitBtn, 'Extract Pages', 'Extracting...', 'extracted', file.name);
-            splitInput.value = ''; pagesInput.value = '';
-            splitBtn.disabled = true;
+            splitInput.value = ''; pagesInput.value = ''; splitBtn.disabled = true; resetPreview();
         });
 
-        // --- 4. OCR LOGIC ---
+        // 4. OCR
         const ocrInput = document.getElementById('ocr-input');
         const ocrBtn = document.getElementById('ocr-btn');
         const ocrWarning = document.getElementById('ocr-warning');
-
         ocrInput.addEventListener('change', (e) => { 
             ocrBtn.disabled = e.target.files.length === 0; 
             if(e.target.files.length > 0) ocrWarning.classList.remove('hidden');
             else ocrWarning.classList.add('hidden');
         });
-
         ocrBtn.addEventListener('click', async () => {
             const file = ocrInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
             await processFile('/api/ocr', formData, ocrBtn, 'Run OCR Scan', 'Scanning...', 'searchable', file.name);
-            ocrInput.value = '';
-            ocrWarning.classList.add('hidden');
-            ocrBtn.disabled = true;
+            ocrInput.value = ''; ocrWarning.classList.add('hidden'); ocrBtn.disabled = true; resetPreview();
         });
 
-        // --- 5. PROTECT LOGIC ---
+        // 5. PROTECT
         const protectInput = document.getElementById('protect-input');
         const openPassword = document.getElementById('open-password');
         const ownerPassword = document.getElementById('owner-password');
@@ -421,24 +634,20 @@
         const disableCopy = document.getElementById('disable-copy');
         const disableModify = document.getElementById('disable-modify');
         const protectBtn = document.getElementById('protect-btn');
-
         function checkProtect() {
             const hasFile = protectInput.files.length > 0;
             const hasRestrictions = disablePrint.checked || disableCopy.checked || disableModify.checked;
             let isValid = false;
-            
             if (hasFile) {
                 if (hasRestrictions) isValid = ownerPassword.value.trim() !== '';
                 else isValid = openPassword.value.trim() !== '' || ownerPassword.value.trim() !== '';
             }
             protectBtn.disabled = !isValid;
         }
-
         [protectInput, openPassword, ownerPassword, disablePrint, disableCopy, disableModify].forEach(el => {
             el.addEventListener('change', checkProtect);
             el.addEventListener('input', checkProtect);
         });
-
         protectBtn.addEventListener('click', async () => {
             const file = protectInput.files[0];
             const formData = new FormData();
@@ -448,106 +657,79 @@
             formData.append('disable_print', disablePrint.checked);
             formData.append('disable_copy', disableCopy.checked);
             formData.append('disable_modify', disableModify.checked);
-
             await processFile('/api/protect', formData, protectBtn, 'Secure PDF', 'Locking...', 'protected', file.name);
             protectInput.value = ''; openPassword.value = ''; ownerPassword.value = '';
             disablePrint.checked = false; disableCopy.checked = false; disableModify.checked = false;
-            protectBtn.disabled = true;
+            protectBtn.disabled = true; resetPreview();
         });
-        
-        // --- 6. OFFICE TO PDF LOGIC ---
+
+        // 6. OFFICE TO PDF
         const toPdfInput = document.getElementById('to-pdf-input');
         const toPdfBtn = document.getElementById('to-pdf-btn');
-        
         toPdfInput.addEventListener('change', (e) => { toPdfBtn.disabled = e.target.files.length === 0; });
-        
         toPdfBtn.addEventListener('click', async () => {
             const file = toPdfInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
-            
-            // Remove the old extension (e.g., .docx) to just pass the base name to our helper
             const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
             await processFile('/api/convert/to-pdf', formData, toPdfBtn, 'Convert to PDF', 'Converting...', baseName, 'converted.pdf');
-            
-            toPdfInput.value = '';
-            toPdfBtn.disabled = true;
+            toPdfInput.value = ''; toPdfBtn.disabled = true; resetPreview();
         });
 
-        // --- 7. PDF TO WORD LOGIC ---
+        // 7. PDF TO WORD
         const toWordInput = document.getElementById('to-word-input');
         const toWordBtn = document.getElementById('to-word-btn');
-        
         toWordInput.addEventListener('change', (e) => { toWordBtn.disabled = e.target.files.length === 0; });
-        
         toWordBtn.addEventListener('click', async () => {
             const file = toWordInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
-            
             const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
             await processFile('/api/convert/to-word', formData, toWordBtn, 'Convert to Word', 'Extracting...', baseName, 'converted.docx');
-            
-            toWordInput.value = '';
-            toWordBtn.disabled = true;
+            toWordInput.value = ''; toWordBtn.disabled = true; resetPreview();
         });
 
-        // --- 8. PDF TO EXCEL LOGIC ---
+        // 8. PDF TO EXCEL
         const toExcelInput = document.getElementById('to-excel-input');
         const toExcelBtn = document.getElementById('to-excel-btn');
-        
         toExcelInput.addEventListener('change', (e) => { toExcelBtn.disabled = e.target.files.length === 0; });
-        
         toExcelBtn.addEventListener('click', async () => {
             const file = toExcelInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
-            
             const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            await processFile('/api/convert/to-excel', formData, toExcelBtn, 'Convert to Excel', 'Extracting Tables...', baseName, 'converted.xlsx');
-            
-            toExcelInput.value = '';
-            toExcelBtn.disabled = true;
+            await processFile('/api/convert/to-excel', formData, toExcelBtn, 'Convert to Excel', 'Extracting...', baseName, 'converted.xlsx');
+            toExcelInput.value = ''; toExcelBtn.disabled = true; resetPreview();
         });
 
-        // --- 9. WATERMARK LOGIC ---
+        // 9. WATERMARK
         const watermarkInput = document.getElementById('watermark-input');
         const watermarkText = document.getElementById('watermark-text');
         const watermarkBtn = document.getElementById('watermark-btn');
-
         function checkWatermark() { watermarkBtn.disabled = !(watermarkInput.files.length > 0 && watermarkText.value.trim() !== ''); }
         watermarkInput.addEventListener('change', checkWatermark);
         watermarkText.addEventListener('input', checkWatermark);
-
         watermarkBtn.addEventListener('click', async () => {
             const file = watermarkInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
             formData.append('text', watermarkText.value);
-            
             const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
             await processFile('/api/watermark', formData, watermarkBtn, 'Apply Watermark', 'Stamping...', baseName, 'watermarked.pdf');
-            
-            watermarkInput.value = ''; watermarkText.value = '';
-            watermarkBtn.disabled = true;
+            watermarkInput.value = ''; watermarkText.value = ''; watermarkBtn.disabled = true; resetPreview();
         });
 
-        // --- 10. SCRUB METADATA LOGIC ---
+        // 10. SCRUB METADATA
         const scrubInput = document.getElementById('scrub-input');
         const scrubBtn = document.getElementById('scrub-btn');
-        
         scrubInput.addEventListener('change', (e) => { scrubBtn.disabled = e.target.files.length === 0; });
-        
         scrubBtn.addEventListener('click', async () => {
             const file = scrubInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
-            
             const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
             await processFile('/api/scrub', formData, scrubBtn, 'Clean PDF', 'Scrubbing...', baseName, 'clean.pdf');
-            
-            scrubInput.value = '';
-            scrubBtn.disabled = true;
+            scrubInput.value = ''; scrubBtn.disabled = true; resetPreview();
         });
 
     </script>
