@@ -15,6 +15,7 @@ import pdfplumber
 import pandas as pd
 import io
 import camelot
+import json
 
 app = FastAPI()
 
@@ -432,49 +433,6 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
         print(f"--- WATERMARK ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to add watermark.")
     
-    from fastapi.responses import JSONResponse
-import base64
-
-# 10.5 Handle Document Preview (First Page Thumbnail)
-@app.post("/api/preview")
-async def preview_pdf(file: UploadFile = File(...)):
-    try:
-        # Save the uploaded file temporarily
-        contents = await file.read()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
-            temp_in.write(contents)
-            input_path = temp_in.name
-
-        # Use our stable pdfplumber to open the PDF
-        with pdfplumber.open(input_path) as pdf:
-            # Grab the first page
-            first_page = pdf.pages[0]
-            
-            # Render it as an image (resolution=72 is standard web quality, fast to generate)
-            img = first_page.to_image(resolution=72)
-            
-            # Save the image to a memory buffer as a JPEG
-            buffer = io.BytesIO()
-            img.original.save(buffer, format="JPEG")
-            img_bytes = buffer.getvalue()
-            
-            # Convert the image to a base64 string so the frontend can display it easily
-            base64_encoded = base64.b64encode(img_bytes).decode('utf-8')
-            img_data_url = f"data:image/jpeg;base64,{base64_encoded}"
-
-        os.unlink(input_path)
-        
-        # Return the image URL and some basic metadata
-        return JSONResponse(content={
-            "filename": file.filename,
-            "total_pages": len(pdf.pages),
-            "preview_image": img_data_url
-        })
-
-    except Exception as e:
-        print(f"--- PREVIEW ERROR ---: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to generate preview.")
-
 # 11. Handle Metadata Scrubbing
 @app.post("/api/scrub")
 async def scrub_metadata(file: UploadFile = File(...)):
@@ -504,3 +462,82 @@ async def scrub_metadata(file: UploadFile = File(...)):
     except Exception as e:
         print(f"--- SCRUB ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to scrub metadata.")
+    
+    import json
+
+# 12. Handle Document Preview (Multi-Page Grid)
+@app.post("/api/preview")
+async def preview_pdf(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        preview_images = []
+        with pdfplumber.open(input_path) as pdf:
+            total_pages = len(pdf.pages)
+            # Cap at 30 pages to prevent the server from freezing on huge books
+            max_pages = min(total_pages, 30)
+            
+            for i in range(max_pages):
+                page = pdf.pages[i]
+                # Resolution 48 is low-res, perfect for fast-loading UI thumbnails
+                img = page.to_image(resolution=48) 
+                buffer = io.BytesIO()
+                img.original.save(buffer, format="JPEG")
+                base64_encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                preview_images.append(f"data:image/jpeg;base64,{base64_encoded}")
+
+        os.unlink(input_path)
+        
+        return JSONResponse(content={
+            "filename": file.filename,
+            "total_pages": total_pages,
+            "preview_images": preview_images,
+            "limited": total_pages > 30
+        })
+
+    except Exception as e:
+        print(f"--- PREVIEW ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate preview.")
+
+# 13. Handle Visual Page Manipulation (Rotate & Delete)
+@app.post("/api/modify-pages")
+async def modify_pages(file: UploadFile = File(...), modifications: str = Form(...)):
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        # modifications is a JSON string: '{"rotations": {"0": 90}, "deletions": [1, 2]}'
+        mods = json.loads(modifications)
+        rotations = mods.get("rotations", {})
+        deletions = set(mods.get("deletions", []))
+
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+
+        for i, page in enumerate(reader.pages):
+            if i in deletions:
+                continue # Skip deleted pages
+            
+            # Check if this page needs rotation
+            if str(i) in rotations:
+                angle = rotations[str(i)] % 360
+                if angle != 0:
+                    page.rotate(angle)
+            
+            writer.add_page(page)
+
+        output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+        writer.write(output_path)
+        writer.close()
+        os.unlink(input_path)
+
+        base_name = os.path.splitext(file.filename)[0]
+        return FileResponse(path=output_path, filename=f"modified_{base_name}.pdf", media_type='application/pdf')
+    except Exception as e:
+        print(f"--- MODIFY ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to modify pages.")
