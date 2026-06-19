@@ -5,37 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local PDF Suite</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = { darkMode: 'class' }
-    </script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
     <style>
-        @keyframes pulse-border {
-            0% { border-color: #e5e7eb; }
-            50% { border-color: #3b82f6; }
-            100% { border-color: #e5e7eb; }
-        }
+        @keyframes pulse-border { 0% { border-color: #e5e7eb; } 50% { border-color: #3b82f6; } 100% { border-color: #e5e7eb; } }
         .dark .processing { animation: pulse-border-dark 2s infinite; pointer-events: none; opacity: 0.7; }
-        @keyframes pulse-border-dark {
-            0% { border-color: #334155; }
-            50% { border-color: #3b82f6; }
-            100% { border-color: #334155; }
-        }
+        @keyframes pulse-border-dark { 0% { border-color: #334155; } 50% { border-color: #3b82f6; } 100% { border-color: #334155; } }
         .processing { animation: pulse-border 2s infinite; pointer-events: none; opacity: 0.7; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        input[type="file"] { text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
         
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .dark ::-webkit-scrollbar-thumb { background: #475569; }
-
-        input[type="file"] {
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            overflow: hidden;
-        }
+        /* Toast Animation */
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast-enter { animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
     </style>
 </head>
 
-<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans h-screen flex overflow-hidden transition-colors duration-300">
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans h-screen flex overflow-hidden transition-colors duration-300 relative">
+
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
+
+    <div id="drag-overlay" class="fixed inset-0 bg-blue-600/90 dark:bg-blue-900/90 z-[100] hidden flex-col items-center justify-center text-white border-8 border-dashed border-white/50 backdrop-blur-sm transition-all">
+        <svg class="w-24 h-24 mb-4 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+        <h2 class="text-4xl font-extrabold tracking-tight">Drop files to upload</h2>
+        <p class="mt-2 text-blue-200 font-medium text-lg">Files will be added to the currently active tool.</p>
+    </div>
 
     <aside class="w-72 shrink-0 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col z-20 transition-colors duration-300">
         <div class="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800">
@@ -53,70 +46,53 @@
         </div>
 
         <div class="flex-grow overflow-y-auto py-4 px-3 space-y-1" id="nav-menu">
-            <div class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3 mt-2">Conversion</div>
-            
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3 mt-2">Conversion</div>
             <button onclick="switchTool('excel')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400 active-tool" data-target="tool-excel">
-                <div class="text-emerald-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></div>
-                <span>PDF to Excel</span>
+                <div class="text-emerald-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></div><span>PDF to Excel</span>
             </button>
             <button onclick="switchTool('word')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-word">
-                <div class="text-teal-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></div>
-                <span>PDF to Word</span>
+                <div class="text-teal-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></div><span>PDF to Word</span>
             </button>
             <button onclick="switchTool('office')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-office">
-                <div class="text-indigo-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>
-                <span>Office to PDF</span>
+                <div class="text-indigo-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div><span>Office to PDF</span>
             </button>
-
-            <div class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Organization</div>
-
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3 pt-4">Organization</div>
             <button onclick="switchTool('manipulate')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-manipulate">
-                <div class="text-pink-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></div>
-                <span>Organize & Rotate</span>
+                <div class="text-pink-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></div><span>Organize & Rotate</span>
             </button>
             <button onclick="switchTool('merge')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-merge">
-                <div class="text-blue-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg></div>
-                <span>Merge PDFs</span>
+                <div class="text-blue-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg></div><span>Merge PDFs</span>
             </button>
             <button onclick="switchTool('split')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-split">
-                <div class="text-purple-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"></path></svg></div>
-                <span>Extract Pages</span>
+                <div class="text-purple-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"></path></svg></div><span>Extract Pages</span>
             </button>
             <button onclick="switchTool('compress')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-compress">
-                <div class="text-green-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></div>
-                <span>Compress PDF</span>
+                <div class="text-green-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></div><span>Compress PDF</span>
             </button>
-
             <div class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Security & Edits</div>
-
             <button onclick="switchTool('protect')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-protect">
-                <div class="text-red-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg></div>
-                <span>Protect & Restrict</span>
+                <div class="text-red-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg></div><span>Protect & Restrict</span>
             </button>
             <button onclick="switchTool('watermark')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-watermark">
-                <div class="text-orange-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg></div>
-                <span>Watermark</span>
+                <div class="text-orange-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg></div><span>Watermark</span>
             </button>
             <button onclick="switchTool('scrub')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-scrub">
-                <div class="text-gray-500 dark:text-gray-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></div>
-                <span>Scrub Metadata</span>
+                <div class="text-gray-500 dark:text-gray-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></div><span>Scrub Metadata</span>
             </button>
             <button onclick="switchTool('ocr')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-ocr">
-                <div class="text-yellow-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></div>
-                <span>Searchable PDF (OCR)</span>
+                <div class="text-yellow-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></div><span>Searchable PDF (OCR)</span>
             </button>
         </div>
     </aside>
 
-    <section class="w-96 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 transition-colors duration-300 shadow-xl overflow-y-auto overflow-x-hidden">
+    <section class="w-96 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 shadow-xl overflow-y-auto overflow-x-hidden">
         <div class="p-8 h-full flex flex-col" id="tools-container">
 
             <div id="tool-excel" class="tool-section block h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF to Excel</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Extract tables automatically using structural analysis and OCR fallback.</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Extract tables automatically. Upload multiple for a ZIP batch.</p>
                 <div class="mb-6 flex-grow">
-                    <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Upload Document</label>
-                    <input type="file" id="to-excel-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-lg p-1 transition-colors" onchange="triggerFileSelect(this)">
+                    <input type="file" id="to-excel-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                 </div>
                 <button id="to-excel-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to Excel</button>
             </div>
@@ -134,7 +110,7 @@
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Office to PDF</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Convert Word, Excel, or PowerPoint files into PDF documents.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="to-pdf-input" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/20 file:text-indigo-700 dark:file:text-indigo-400 hover:file:bg-indigo-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
+                    <input type="file" id="to-pdf-input" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/20 file:text-indigo-700 dark:file:text-indigo-400 hover:file:bg-indigo-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                 </div>
                 <button id="to-pdf-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-indigo-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to PDF</button>
             </div>
@@ -144,42 +120,42 @@
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Visually rotate or delete pages using the preview grid on the right.</p>
                 <div class="mb-6 flex-grow">
                     <input type="file" id="manipulate-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-50 dark:file:bg-pink-900/20 file:text-pink-700 dark:file:text-pink-400 hover:file:bg-pink-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
-                    <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                        <strong class="block mb-2 text-slate-800 dark:text-white">How to use:</strong>
-                        1. Upload a file above.<br>
-                        2. Use the buttons on the preview thumbnails to rotate (↻) or delete (🗑️) pages.<br>
-                        3. Click "Apply Changes" below.
-                    </div>
                 </div>
                 <button id="manipulate-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-pink-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Apply Changes</button>
             </div>
 
             <div id="tool-merge" class="tool-section hidden h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Merge PDFs</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Combine multiple PDF files into a single document.</p>
+                <p class="text-sm text-slate-500 mb-8">Combine multiple files.</p>
                 <div class="mb-6 flex-grow">
                     <input type="file" id="merge-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
-                    <div id="merge-list" class="text-xs text-slate-500 dark:text-slate-400 mt-2 truncate hidden"></div>
                 </div>
                 <button id="merge-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Merge Files</button>
             </div>
 
             <div id="tool-split" class="tool-section hidden h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Extract Pages</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Pull specific pages out into a new document.</p>
+                <p class="text-sm text-slate-500 mb-8">Click pages in the preview grid to select them.</p>
                 <div class="mb-6 flex-grow">
                     <input type="file" id="split-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 dark:file:bg-purple-900/20 file:text-purple-700 dark:file:text-purple-400 hover:file:bg-purple-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                     <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Pages to Extract</label>
-                    <input type="text" id="pages-input" placeholder="e.g., 1, 3, 5-7" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500 transition-colors">
+                    <input type="text" id="pages-input" placeholder="e.g., 1, 3, 5-7" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
                 </div>
                 <button id="split-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-purple-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Extract Pages</button>
             </div>
 
             <div id="tool-compress" class="tool-section hidden h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Compress PDF</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Reduce the file size of your document significantly.</p>
+                <p class="text-sm text-slate-500 mb-6">Reduce file size significantly.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="compress-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 dark:file:bg-green-900/20 file:text-green-700 dark:file:text-green-400 hover:file:bg-green-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
+                    <input type="file" id="compress-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 dark:file:bg-green-900/20 file:text-green-700 dark:file:text-green-400 hover:file:bg-green-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
+                    
+                    <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Compression Level</label>
+                    <select id="compress-level" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-green-500">
+                        <option value="low">Low (Best Quality)</option>
+                        <option value="medium" selected>Medium (Recommended)</option>
+                        <option value="high">High (Smallest File Size)</option>
+                    </select>
                 </div>
                 <button id="compress-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Compress File</button>
             </div>
@@ -195,15 +171,9 @@
                     </div>
                     <div class="mt-4 bg-slate-50 dark:bg-slate-800 rounded-lg p-4 border border-slate-100 dark:border-slate-700">
                         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">Lock Features</span>
-                        <label class="flex items-center space-x-3 text-sm text-slate-700 dark:text-slate-300 mb-2 cursor-pointer">
-                            <input type="checkbox" id="disable-print" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Printing</span>
-                        </label>
-                        <label class="flex items-center space-x-3 text-sm text-slate-700 dark:text-slate-300 mb-2 cursor-pointer">
-                            <input type="checkbox" id="disable-copy" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Copying</span>
-                        </label>
-                        <label class="flex items-center space-x-3 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
-                            <input type="checkbox" id="disable-modify" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Editing</span>
-                        </label>
+                        <label class="flex items-center space-x-3 text-sm text-slate-700 dark:text-slate-300 mb-2 cursor-pointer"><input type="checkbox" id="disable-print" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Printing</span></label>
+                        <label class="flex items-center space-x-3 text-sm text-slate-700 dark:text-slate-300 mb-2 cursor-pointer"><input type="checkbox" id="disable-copy" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Copying</span></label>
+                        <label class="flex items-center space-x-3 text-sm text-slate-700 dark:text-slate-300 cursor-pointer"><input type="checkbox" id="disable-modify" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"><span>Disable Editing</span></label>
                     </div>
                 </div>
                 <button id="protect-btn" class="w-full mt-4 bg-slate-900 dark:bg-slate-800 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Secure PDF</button>
@@ -222,7 +192,7 @@
 
             <div id="tool-scrub" class="tool-section hidden h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Scrub Metadata</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Remove hidden tracking data (Author, Date, Software).</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Remove hidden tracking data.</p>
                 <div class="mb-6 flex-grow">
                     <input type="file" id="scrub-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                 </div>
@@ -230,14 +200,10 @@
             </div>
 
             <div id="tool-ocr" class="tool-section hidden h-full flex flex-col">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Searchable PDF (OCR)</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Use AI to read scanned documents and make text selectable.</p>
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Searchable PDF</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Make text selectable.</p>
                 <div class="mb-6 flex-grow">
                     <input type="file" id="ocr-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 dark:file:bg-yellow-900/20 file:text-yellow-700 dark:file:text-yellow-400 hover:file:bg-yellow-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
-                    <div id="ocr-warning" class="hidden flex p-4 mb-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-300" role="alert">
-                      <svg class="flex-shrink-0 inline w-4 h-4 me-3 mt-[2px]" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20"><path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/></svg>
-                      <div><span class="font-medium">Note:</span> This AI process is intensive and may take a few minutes depending on file size.</div>
-                    </div>
                 </div>
                 <button id="ocr-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-yellow-500 hover:text-slate-900 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Run OCR Scan</button>
             </div>
@@ -246,48 +212,96 @@
     </section>
 
     <section class="flex-grow min-w-0 bg-slate-100/50 dark:bg-slate-950/50 flex flex-col items-center justify-center relative overflow-hidden transition-colors duration-300">
-        
-        <div id="preview-empty" class="text-center transition-opacity duration-300">
+        <div id="preview-empty" class="text-center">
             <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white dark:bg-slate-800 shadow-sm mb-6 text-slate-300 dark:text-slate-600">
                 <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
             </div>
             <h3 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Live Preview</h3>
-            <p class="text-slate-500 dark:text-slate-500 max-w-sm mx-auto">Upload a document to view its contents before processing.</p>
+            <p class="text-slate-500">Upload a document to view its contents.</p>
         </div>
 
-        <div id="preview-loading" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-slate-100/80 dark:bg-slate-950/80 backdrop-blur-sm z-10 transition-opacity duration-300">
+        <div id="preview-loading" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-slate-100/80 dark:bg-slate-950/80 backdrop-blur-sm z-10">
             <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p class="text-slate-600 dark:text-slate-300 font-medium">Generating preview...</p>
+            <p class="text-slate-600 dark:text-slate-300 font-medium text-sm">Processing...</p>
         </div>
 
         <div id="preview-active" class="hidden flex-col items-center w-full h-full max-h-full pt-8">
             <div class="bg-white dark:bg-slate-800 py-3 px-6 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 mb-6 flex items-center space-x-4 shrink-0">
                 <span id="preview-filename" class="text-sm font-bold text-slate-700 dark:text-slate-200 truncate max-w-[200px]">document.pdf</span>
                 <div class="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
-                <span id="preview-pages" class="text-sm text-slate-500 dark:text-slate-400">0 pages</span>
+                <span id="preview-pages" class="text-sm text-slate-500">0 pages</span>
             </div>
             
             <div id="preview-single" class="flex-grow w-full flex justify-center items-start overflow-y-auto pb-8">
-                <img id="preview-image" src="" alt="PDF Preview" class="max-w-full lg:max-w-3xl bg-white shadow-2xl border border-slate-200 dark:border-slate-700 rounded-sm">
+                <img id="preview-image" src="" class="max-w-full lg:max-w-3xl bg-white shadow-2xl border border-slate-200 dark:border-slate-700 rounded-sm">
             </div>
 
-            <div id="preview-grid" class="hidden flex-grow w-full overflow-y-auto pb-8 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 content-start px-8">
-                </div>
+            <div id="preview-grid" class="hidden flex-grow w-full overflow-y-auto pb-8 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 content-start px-8"></div>
 
             <div id="pagination-controls" class="hidden flex w-full items-center justify-between mt-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 p-4 shrink-0 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
-                <button id="prev-page-btn" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed" onclick="event.preventDefault(); loadPreviewPages(-30)">← Previous 30</button>
+                <button id="prev-page-btn" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-lg disabled:opacity-40" onclick="event.preventDefault(); loadPreviewPages(-30)">← Prev 30</button>
                 <span id="pagination-info" class="text-sm font-semibold text-slate-600 dark:text-slate-400">Pages 1 - 30</span>
-                <button id="next-page-btn" class="px-5 py-2.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-800/50 text-blue-600 dark:text-blue-400 text-sm font-bold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed" onclick="event.preventDefault(); loadPreviewPages(30)">Next 30 →</button></div>
+                <button id="next-page-btn" class="px-5 py-2.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-bold rounded-lg disabled:opacity-40" onclick="event.preventDefault(); loadPreviewPages(30)">Next 30 →</button>
+            </div>
         </div>
     </section>
 
     <script>
-        // --- GLOBAL STATE ---
         let currentActiveTool = 'excel';
-        let currentUploadedFile = null;
+        let currentUploadedFiles = [];
         let currentPageStart = 0;
         let loadedPreviewImages = [];
         let pageMods = { rotations: {}, deletions: [] };
+        let pagesToExtract = new Set(); // Tracks clicked pages for Extract tool
+
+        // --- TOAST NOTIFICATION SYSTEM ---
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colorClass = type === 'success' ? 'bg-emerald-500' : 'bg-red-500';
+            const icon = type === 'success' 
+                ? `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`
+                : `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
+
+            toast.className = `toast-enter flex items-center p-4 rounded-xl shadow-xl border border-white/10 backdrop-blur-md ${colorClass} text-white font-medium text-sm w-72`;
+            toast.innerHTML = `<div class="mr-3">${icon}</div><div>${message}</div>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // --- DRAG AND DROP LOGIC ---
+        const overlay = document.getElementById('drag-overlay');
+        let dragCounter = 0;
+
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault(); dragCounter++;
+            overlay.classList.remove('hidden'); overlay.classList.add('flex');
+        });
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault(); dragCounter--;
+            if (dragCounter === 0) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }
+        });
+        document.addEventListener('dragover', (e) => e.preventDefault());
+        document.addEventListener('drop', (e) => {
+            e.preventDefault(); dragCounter = 0;
+            overlay.classList.add('hidden'); overlay.classList.remove('flex');
+            
+            if (e.dataTransfer.files.length > 0) {
+                const activeInput = document.getElementById(`tool-${currentActiveTool}`).querySelector('input[type="file"]');
+                if (activeInput) {
+                    activeInput.files = e.dataTransfer.files;
+                    triggerFileSelect(activeInput);
+                    showToast(`${e.dataTransfer.files.length} file(s) loaded.`);
+                }
+            }
+        });
 
         // --- THEME TOGGLE LOGIC ---
         const themeToggleBtn = document.getElementById('theme-toggle');
@@ -295,113 +309,98 @@
         const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
 
         if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            document.documentElement.classList.add('dark');
-            themeToggleLightIcon.classList.remove('hidden');
+            document.documentElement.classList.add('dark'); themeToggleLightIcon.classList.remove('hidden');
         } else {
-            document.documentElement.classList.remove('dark');
-            themeToggleDarkIcon.classList.remove('hidden');
+            document.documentElement.classList.remove('dark'); themeToggleDarkIcon.classList.remove('hidden');
         }
 
         themeToggleBtn.addEventListener('click', function() {
-            themeToggleDarkIcon.classList.toggle('hidden');
-            themeToggleLightIcon.classList.toggle('hidden');
+            themeToggleDarkIcon.classList.toggle('hidden'); themeToggleLightIcon.classList.toggle('hidden');
             if (localStorage.getItem('color-theme')) {
-                if (localStorage.getItem('color-theme') === 'light') {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('color-theme', 'dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('color-theme', 'light');
-                }
+                if (localStorage.getItem('color-theme') === 'light') { document.documentElement.classList.add('dark'); localStorage.setItem('color-theme', 'dark'); } 
+                else { document.documentElement.classList.remove('dark'); localStorage.setItem('color-theme', 'light'); }
             } else {
-                if (document.documentElement.classList.contains('dark')) {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('color-theme', 'light');
-                } else {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('color-theme', 'dark');
-                }
+                if (document.documentElement.classList.contains('dark')) { document.documentElement.classList.remove('dark'); localStorage.setItem('color-theme', 'light'); } 
+                else { document.documentElement.classList.add('dark'); localStorage.setItem('color-theme', 'dark'); }
             }
         });
 
-        // --- SIDEBAR SWITCHING LOGIC ---
+        // --- SIDEBAR LOGIC ---
         function switchTool(toolName) {
             currentActiveTool = toolName;
-            
-            // Reset Sidebar Styling
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('bg-slate-100', 'dark:bg-slate-800/50', 'active-tool');
-                const iconDiv = btn.querySelector('div');
-                if(iconDiv) {
-                    const colorClass = Array.from(iconDiv.classList).find(c => c.startsWith('text-'));
-                    if(colorClass) btn.classList.remove(colorClass.replace('text-', 'bg-').replace('-500', '-50'), 'dark:bg-transparent');
-                }
-            });
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('bg-slate-100', 'dark:bg-slate-800/50', 'active-tool'));
+            document.querySelector(`[data-target="tool-${toolName}"]`).classList.add('bg-slate-100', 'dark:bg-slate-800/50', 'active-tool');
 
-            // Set Active Sidebar Style
-            const activeBtn = document.querySelector(`[data-target="tool-${toolName}"]`);
-            activeBtn.classList.add('bg-slate-100', 'dark:bg-slate-800/50', 'active-tool');
-
-            // Hide all tools, show target
-            document.querySelectorAll('.tool-section').forEach(sec => {
-                sec.classList.remove('block');
-                sec.classList.add('hidden');
-            });
+            document.querySelectorAll('.tool-section').forEach(sec => { sec.classList.remove('block'); sec.classList.add('hidden'); });
             document.getElementById(`tool-${toolName}`).classList.remove('hidden');
             document.getElementById(`tool-${toolName}`).classList.add('block');
             
-            // Toggle preview views dynamically
-            if (!document.getElementById('preview-active').classList.contains('hidden')) {
-                if (toolName === 'manipulate') {
-                    document.getElementById('preview-single').classList.add('hidden');
-                    document.getElementById('preview-grid').classList.remove('hidden');
-                    document.getElementById('preview-grid').classList.add('grid');
-                    document.getElementById('pagination-controls').classList.remove('hidden');
-                    renderPreviewGrid();
-                } else {
-                    document.getElementById('preview-grid').classList.add('hidden');
-                    document.getElementById('preview-grid').classList.remove('grid');
-                    document.getElementById('pagination-controls').classList.add('hidden');
-                    document.getElementById('preview-single').classList.remove('hidden');
-                }
+            resetPreview();
+        }
+
+        // --- PREVIEW LOGIC (Handles Batch Merge & Grid Views) ---
+        async function triggerFileSelect(inputElement) {
+            if (!inputElement.files || inputElement.files.length === 0) { resetPreview(); return; }
+            
+            currentUploadedFiles = Array.from(inputElement.files);
+            currentPageStart = 0; pageMods = { rotations: {}, deletions: [] }; pagesToExtract.clear();
+            
+            const btnId = `${inputElement.id.replace('-input', '')}-btn`;
+            if(document.getElementById(btnId)) document.getElementById(btnId).disabled = false;
+
+            if (currentActiveTool === 'merge' && currentUploadedFiles.length > 1) {
+                await fetchMergePreview();
             } else {
-                resetPreview();
+                await fetchPreviewData();
             }
         }
 
-        // --- LIVE PREVIEW & PAGINATION LOGIC ---
-        function triggerFileSelect(inputElement) {
-            if (!inputElement.files || inputElement.files.length === 0) {
-                resetPreview();
-                return;
-            }
-            currentUploadedFile = inputElement.files[0];
-            currentPageStart = 0; // Reset to page 1 on new file upload
-            pageMods = { rotations: {}, deletions: [] }; // Clear modifications
-            fetchPreviewData();
+        async function fetchMergePreview() {
+            showLoadingState();
+            const formData = new FormData();
+            currentUploadedFiles.forEach(f => formData.append("files", f));
+
+            try {
+                const response = await fetch("/api/preview-merge", { method: "POST", body: formData });
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    document.getElementById('preview-filename').innerText = "Merge Queue";
+                    document.getElementById('preview-pages').innerText = `${currentUploadedFiles.length} files`;
+                    
+                    const grid = document.getElementById('preview-grid');
+                    grid.innerHTML = '';
+                    
+                    data.previews.forEach((item, index) => {
+                        const card = document.createElement('div');
+                        card.className = `flex flex-col items-center`;
+                        card.innerHTML = `
+                            <img src="${item.image}" class="w-full shadow-md border border-slate-200 rounded bg-white">
+                            <div class="mt-2 text-xs font-bold text-slate-500 truncate w-full text-center">${index + 1}. ${item.filename}</div>`;
+                        grid.appendChild(card);
+                    });
+
+                    activateGridView(false); 
+                } else { resetPreview(); }
+            } catch (error) { resetPreview(); showToast("Merge preview failed.", "error"); }
         }
 
         async function loadPreviewPages(offset) {
-            if (!currentUploadedFile) return;
+            if (currentUploadedFiles.length === 0) return;
             currentPageStart += offset;
             if (currentPageStart < 0) currentPageStart = 0;
             await fetchPreviewData();
         }
 
         async function fetchPreviewData() {
-            document.getElementById('preview-empty').classList.add('hidden');
-            document.getElementById('preview-active').classList.add('hidden');
-            document.getElementById('preview-loading').classList.remove('hidden');
-
+            showLoadingState();
+            const file = currentUploadedFiles[0];
             const formData = new FormData();
-            formData.append("file", currentUploadedFile);
+            formData.append("file", file);
             formData.append("page_start", currentPageStart);
 
             try {
-                if (!currentUploadedFile.name.toLowerCase().endsWith('.pdf')) {
-                    showPreviewWithoutImage(currentUploadedFile.name, "Office Document");
-                    return;
-                }
+                if (!file.name.toLowerCase().endsWith('.pdf')) { resetPreview(); return; }
 
                 const response = await fetch("/api/preview", { method: "POST", body: formData });
                 if (response.ok) {
@@ -410,137 +409,114 @@
                     document.getElementById('preview-filename').innerText = data.filename;
                     document.getElementById('preview-pages').innerText = `${data.total_pages} page(s)`;
                     
-                    // Update Pagination UI
                     document.getElementById('pagination-info').innerText = `Pages ${data.current_start + 1} - ${data.current_end} of ${data.total_pages}`;
                     document.getElementById('prev-page-btn').disabled = data.current_start === 0;
                     document.getElementById('next-page-btn').disabled = !data.has_more;
 
-                    // Store images globally
                     loadedPreviewImages = data.preview_images || [];
+                    if (loadedPreviewImages.length > 0) document.getElementById('preview-image').src = loadedPreviewImages[0];
 
-                    // Display single image fallback
-                    if (loadedPreviewImages.length > 0) {
-                        document.getElementById('preview-image').src = loadedPreviewImages[0];
-                    }
-
-                    // Render Grid if on manipulate tool
-                    if (currentActiveTool === 'manipulate') {
-                        document.getElementById('preview-single').classList.add('hidden');
-                        document.getElementById('preview-grid').classList.remove('hidden');
-                        document.getElementById('preview-grid').classList.add('grid');
-                        document.getElementById('pagination-controls').classList.remove('hidden');
+                    if (currentActiveTool === 'manipulate' || currentActiveTool === 'split') {
                         renderPreviewGrid();
-                        document.getElementById('manipulate-btn').disabled = false;
+                        activateGridView(true);
                     } else {
-                        document.getElementById('preview-grid').classList.add('hidden');
-                        document.getElementById('preview-grid').classList.remove('grid');
-                        document.getElementById('pagination-controls').classList.add('hidden');
-                        document.getElementById('preview-single').classList.remove('hidden');
+                        activateSingleView();
                     }
-
-                    document.getElementById('preview-loading').classList.add('hidden');
-                    document.getElementById('preview-active').classList.remove('hidden');
-                    document.getElementById('preview-active').classList.add('flex');
-                } else {
-                    resetPreview();
-                }
-            } catch (error) {
-                console.error("Preview failed:", error);
-                resetPreview();
-            }
+                } else { resetPreview(); }
+            } catch (error) { resetPreview(); showToast("Preview failed to generate.", "error"); }
         }
 
         function renderPreviewGrid() {
             const grid = document.getElementById('preview-grid');
             grid.innerHTML = '';
             
-            const isManipulateTool = (currentActiveTool === 'manipulate');
-
             loadedPreviewImages.forEach((imgSrc, index) => {
-                // Calculate the absolute page number based on pagination offset
                 const absoluteIndex = currentPageStart + index;
+                const pageNumRaw = absoluteIndex + 1;
                 
-                const rotation = pageMods.rotations[absoluteIndex] || 0;
                 const isDeleted = pageMods.deletions.includes(absoluteIndex);
+                const isSelectedForExtract = pagesToExtract.has(pageNumRaw);
                 
                 const card = document.createElement('div');
-                card.className = `relative flex flex-col items-center transition-all ${isDeleted ? 'opacity-30 grayscale' : ''}`;
+                card.className = `relative flex flex-col items-center transition-all cursor-pointer border-4 ${isSelectedForExtract ? 'border-purple-500 scale-105' : 'border-transparent'} rounded-lg p-1 ${isDeleted ? 'opacity-30 grayscale' : ''}`;
                 
+                if (currentActiveTool === 'split') {
+                    card.onclick = () => {
+                        if(pagesToExtract.has(pageNumRaw)) pagesToExtract.delete(pageNumRaw);
+                        else pagesToExtract.add(pageNumRaw);
+                        
+                        document.getElementById('pages-input').value = Array.from(pagesToExtract).sort((a,b)=>a-b).join(', ');
+                        document.getElementById('split-btn').disabled = pagesToExtract.size === 0;
+                        renderPreviewGrid();
+                    };
+                }
+
                 const img = document.createElement('img');
                 img.src = imgSrc;
                 img.className = 'w-full shadow-md border border-slate-200 dark:border-slate-700 rounded bg-white transition-transform duration-300';
-                img.style.transform = `rotate(${rotation}deg)`;
+                img.style.transform = `rotate(${pageMods.rotations[absoluteIndex] || 0}deg)`;
                 
                 const pageNum = document.createElement('div');
-                pageNum.className = 'mt-2 text-xs font-bold text-slate-500';
-                pageNum.innerText = `Page ${absoluteIndex + 1}`;
+                pageNum.className = `mt-2 text-xs font-bold ${isSelectedForExtract ? 'text-purple-600' : 'text-slate-500'}`;
+                pageNum.innerText = `Page ${pageNumRaw}`;
 
-                card.appendChild(img);
-                card.appendChild(pageNum);
+                card.appendChild(img); card.appendChild(pageNum);
 
-                if (isManipulateTool) {
+                if (currentActiveTool === 'manipulate') {
                     const controls = document.createElement('div');
-                    controls.className = 'absolute top-2 right-2 flex space-x-1 opacity-0 transition-opacity bg-white/90 p-1 rounded shadow';
-                    
-                    const rotBtn = document.createElement('button');
-                    rotBtn.innerHTML = '↻';
-                    rotBtn.className = 'w-8 h-8 flex items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-slate-700';
-                    rotBtn.onclick = () => {
-                        pageMods.rotations[absoluteIndex] = (pageMods.rotations[absoluteIndex] || 0) + 90;
-                        renderPreviewGrid();
-                    };
-                    
-                    const delBtn = document.createElement('button');
-                    delBtn.innerHTML = isDeleted ? '↩️' : '🗑️';
-                    delBtn.className = 'w-8 h-8 flex items-center justify-center rounded bg-red-100 hover:bg-red-200 text-red-600';
-                    delBtn.onclick = () => {
-                        if (isDeleted) pageMods.deletions = pageMods.deletions.filter(i => i !== absoluteIndex);
-                        else pageMods.deletions.push(absoluteIndex);
-                        renderPreviewGrid();
-                    };
-
-                    controls.appendChild(rotBtn);
-                    controls.appendChild(delBtn);
-                    card.appendChild(controls);
-                    
+                    controls.className = 'absolute top-3 right-3 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1 rounded shadow';
+                    controls.innerHTML = `
+                        <button class="w-8 h-8 rounded bg-slate-100 hover:bg-slate-200" onclick="rotatePage(event, ${absoluteIndex})">↻</button>
+                        <button class="w-8 h-8 rounded bg-red-100 text-red-600 hover:bg-red-200" onclick="deletePage(event, ${absoluteIndex})">${isDeleted ? '↩️' : '🗑️'}</button>
+                    `;
                     card.classList.add('group');
-                    controls.classList.add('group-hover:opacity-100');
+                    card.appendChild(controls);
                 }
-
                 grid.appendChild(card);
             });
         }
 
-        function showPreviewWithoutImage(filename, type) {
+        window.rotatePage = (e, idx) => { e.stopPropagation(); pageMods.rotations[idx] = (pageMods.rotations[idx] || 0) + 90; renderPreviewGrid(); };
+        window.deletePage = (e, idx) => { e.stopPropagation(); if(pageMods.deletions.includes(idx)) pageMods.deletions = pageMods.deletions.filter(i=>i!==idx); else pageMods.deletions.push(idx); renderPreviewGrid(); };
+
+        // --- VIEW STATE MANAGERS ---
+        function showLoadingState() {
+            document.getElementById('preview-empty').classList.add('hidden');
+            document.getElementById('preview-active').classList.add('hidden');
+            document.getElementById('preview-loading').classList.remove('hidden');
+        }
+        function activateGridView(showPagination) {
             document.getElementById('preview-loading').classList.add('hidden');
-            document.getElementById('preview-filename').innerText = filename;
-            document.getElementById('preview-pages').innerText = type;
-            document.getElementById('preview-image').src = ""; 
-            
+            document.getElementById('preview-single').classList.add('hidden');
+            document.getElementById('preview-grid').classList.remove('hidden');
+            document.getElementById('preview-grid').classList.add('grid');
+            if(showPagination) document.getElementById('pagination-controls').classList.remove('hidden');
+            else document.getElementById('pagination-controls').classList.add('hidden');
+            document.getElementById('preview-active').classList.remove('hidden');
+            document.getElementById('preview-active').classList.add('flex');
+        }
+        function activateSingleView() {
+            document.getElementById('preview-loading').classList.add('hidden');
             document.getElementById('preview-grid').classList.add('hidden');
             document.getElementById('preview-grid').classList.remove('grid');
             document.getElementById('pagination-controls').classList.add('hidden');
             document.getElementById('preview-single').classList.remove('hidden');
-            
             document.getElementById('preview-active').classList.remove('hidden');
             document.getElementById('preview-active').classList.add('flex');
         }
-
         function resetPreview() {
             document.getElementById('preview-loading').classList.add('hidden');
             document.getElementById('preview-active').classList.add('hidden');
             document.getElementById('preview-active').classList.remove('flex');
             document.getElementById('preview-empty').classList.remove('hidden');
-            currentUploadedFile = null;
-            loadedPreviewImages = [];
-            pageMods = { rotations: {}, deletions: [] };
+            currentUploadedFiles = []; loadedPreviewImages = [];
+            document.querySelectorAll('input[type="file"]').forEach(i => i.value = '');
         }
 
         // --- GENERIC PROCESSING ENGINE ---
         async function processFile(url, formData, btnElement, defaultText, processingText, fileNamePrefix, fileName) {
             const originalContainer = btnElement.parentElement;
-            btnElement.textContent = processingText;
-            btnElement.disabled = true;
+            btnElement.textContent = processingText; btnElement.disabled = true;
             originalContainer.classList.add('processing');
 
             try {
@@ -549,219 +525,106 @@
                     const blob = await response.blob();
                     const downloadUrl = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = downloadUrl;
+                    a.style.display = 'none'; a.href = downloadUrl;
                     
-                    const contentType = response.headers.get('Content-Type');
-                    if (contentType === 'application/zip') {
-                        a.download = `${fileNamePrefix}_batch.zip`;
-                    } else {
-                        a.download = `${fileNamePrefix}_${fileName}`;
-                    }
+                    if (response.headers.get('Content-Type') === 'application/zip') a.download = `${fileNamePrefix}_batch.zip`;
+                    else a.download = `${fileNamePrefix}_${fileName}`;
                     
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(downloadUrl);
-                } else {
-                    alert(`Error processing file on the server.`);
-                }
-            } catch (error) {
-                console.error('API Error:', error);
-                alert("Something went wrong communicating with the server.");
-            } finally {
+                    document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(downloadUrl);
+                    showToast(`${defaultText} Completed!`, "success");
+                } else { showToast(`Error processing file on server.`, "error"); }
+            } catch (error) { showToast("Connection error.", "error"); } 
+            finally {
                 btnElement.textContent = defaultText;
                 originalContainer.classList.remove('processing');
+                resetPreview();
             }
         }
 
-        // --- TOOL EVENT LISTENERS ---
-
-        // MANIPULATE LOGIC
-        const manipulateInput = document.getElementById('manipulate-input');
-        const manipulateBtn = document.getElementById('manipulate-btn');
-        manipulateBtn.addEventListener('click', async () => {
-            const file = manipulateInput.files[0];
+        // --- BUTTON EVENT LISTENERS ---
+        document.getElementById('to-excel-btn').addEventListener('click', () => {
             const formData = new FormData();
-            formData.append('file', file);
-            formData.append('modifications', JSON.stringify(pageMods));
-            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            await processFile('/api/modify-pages', formData, manipulateBtn, 'Apply Changes', 'Rebuilding...', baseName, 'organized.pdf');
-            manipulateInput.value = ''; manipulateBtn.disabled = true; resetPreview();
+            currentUploadedFiles.forEach(f => formData.append('files', f));
+            processFile('/api/convert/to-excel', formData, document.getElementById('to-excel-btn'), 'Convert to Excel', 'Extracting Tables...', 'tables', currentUploadedFiles[0].name.replace('.pdf','.xlsx'));
+        });
+
+        document.getElementById('manipulate-btn').addEventListener('click', () => {
+            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]); formData.append('modifications', JSON.stringify(pageMods));
+            processFile('/api/modify-pages', formData, document.getElementById('manipulate-btn'), 'Apply Changes', 'Rebuilding...', 'organized', currentUploadedFiles[0].name);
+        });
+
+        document.getElementById('merge-btn').addEventListener('click', () => {
+            const formData = new FormData(); currentUploadedFiles.forEach(f => formData.append('files', f));
+            processFile('/api/merge', formData, document.getElementById('merge-btn'), 'Merge Files', 'Merging...', 'merged', 'document.pdf');
+        });
+
+        document.getElementById('split-btn').addEventListener('click', () => {
+            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]); formData.append('pages', document.getElementById('pages-input').value);
+            processFile('/api/split', formData, document.getElementById('split-btn'), 'Extract Pages', 'Extracting...', 'extracted', currentUploadedFiles[0].name);
+        });
+
+        document.getElementById('compress-btn').addEventListener('click', () => {
+            const formData = new FormData(); currentUploadedFiles.forEach(f => formData.append('files', f));
+            formData.append('level', document.getElementById('compress-level').value); 
+            processFile('/api/compress', formData, document.getElementById('compress-btn'), 'Compress File', 'Compressing...', 'compressed', currentUploadedFiles[0].name);
         });
         
-        // 1. MERGE
-        const mergeInput = document.getElementById('merge-input');
-        const mergeBtn = document.getElementById('merge-btn');
-        const mergeList = document.getElementById('merge-list');
-        mergeInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 1) {
-                mergeBtn.disabled = false;
-                mergeList.textContent = `${e.target.files.length} files selected`;
-                mergeList.classList.remove('hidden');
-            } else {
-                mergeBtn.disabled = true;
-                mergeList.classList.add('hidden');
-            }
+        document.getElementById('to-word-btn').addEventListener('click', () => {
+            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]);
+            processFile('/api/convert/to-word', formData, document.getElementById('to-word-btn'), 'Convert to Word', 'Extracting...', 'word', currentUploadedFiles[0].name.replace('.pdf','.docx'));
         });
-        mergeBtn.addEventListener('click', async () => {
-            const formData = new FormData();
-            Array.from(mergeInput.files).forEach(file => formData.append('files', file));
-            await processFile('/api/merge', formData, mergeBtn, 'Merge Files', 'Merging...', 'merged', 'document.pdf');
-            mergeInput.value = ''; mergeBtn.disabled = true; mergeList.classList.add('hidden'); resetPreview();
+        
+        document.getElementById('to-pdf-btn').addEventListener('click', () => {
+            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]);
+            const newName = currentUploadedFiles[0].name.split('.').slice(0, -1).join('.') + '.pdf';
+            processFile('/api/convert/to-pdf', formData, document.getElementById('to-pdf-btn'), 'Convert to PDF', 'Converting...', 'pdf', newName);
         });
-
-        // 2. COMPRESS
-        const compressInput = document.getElementById('compress-input');
-        const compressBtn = document.getElementById('compress-btn');
-        compressInput.addEventListener('change', (e) => { compressBtn.disabled = e.target.files.length === 0; });
-        compressBtn.addEventListener('click', async () => {
-            const formData = new FormData();
-            Array.from(compressInput.files).forEach(file => formData.append('files', file));
-            const firstFileName = compressInput.files[0].name;
-            const btnText = compressInput.files.length > 1 ? `Compressing ${compressInput.files.length} files...` : 'Compressing...';
-            await processFile('/api/compress', formData, compressBtn, 'Compress File', btnText, 'compressed', firstFileName);
-            compressInput.value = ''; compressBtn.disabled = true; resetPreview();
+        
+        document.getElementById('protect-btn').addEventListener('click', () => {
+            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]);
+            formData.append('open_password', document.getElementById('open-password').value);
+            formData.append('owner_password', document.getElementById('owner-password').value);
+            formData.append('disable_print', document.getElementById('disable-print').checked);
+            formData.append('disable_copy', document.getElementById('disable-copy').checked);
+            formData.append('disable_modify', document.getElementById('disable-modify').checked);
+            processFile('/api/protect', formData, document.getElementById('protect-btn'), 'Secure PDF', 'Locking...', 'protected', currentUploadedFiles[0].name);
         });
-
-        // 3. EXTRACT
-        const splitInput = document.getElementById('split-input');
-        const pagesInput = document.getElementById('pages-input');
-        const splitBtn = document.getElementById('split-btn');
-        function checkSplit() { splitBtn.disabled = !(splitInput.files.length > 0 && pagesInput.value.trim() !== ''); }
-        splitInput.addEventListener('change', checkSplit);
-        pagesInput.addEventListener('input', checkSplit);
-        splitBtn.addEventListener('click', async () => {
-            const file = splitInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('pages', pagesInput.value);
-            await processFile('/api/split', formData, splitBtn, 'Extract Pages', 'Extracting...', 'extracted', file.name);
-            splitInput.value = ''; pagesInput.value = ''; splitBtn.disabled = true; resetPreview();
+        
+        document.getElementById('watermark-btn').addEventListener('click', () => {
+            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]);
+            formData.append('text', document.getElementById('watermark-text').value);
+            processFile('/api/watermark', formData, document.getElementById('watermark-btn'), 'Apply Watermark', 'Stamping...', 'watermarked', currentUploadedFiles[0].name);
         });
-
-        // 4. OCR
-        const ocrInput = document.getElementById('ocr-input');
-        const ocrBtn = document.getElementById('ocr-btn');
-        const ocrWarning = document.getElementById('ocr-warning');
-        ocrInput.addEventListener('change', (e) => { 
-            ocrBtn.disabled = e.target.files.length === 0; 
-            if(e.target.files.length > 0) ocrWarning.classList.remove('hidden');
-            else ocrWarning.classList.add('hidden');
+        
+        document.getElementById('scrub-btn').addEventListener('click', () => {
+            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]);
+            processFile('/api/scrub', formData, document.getElementById('scrub-btn'), 'Clean PDF', 'Scrubbing...', 'clean', currentUploadedFiles[0].name);
         });
-        ocrBtn.addEventListener('click', async () => {
-            const file = ocrInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            await processFile('/api/ocr', formData, ocrBtn, 'Run OCR Scan', 'Scanning...', 'searchable', file.name);
-            ocrInput.value = ''; ocrWarning.classList.add('hidden'); ocrBtn.disabled = true; resetPreview();
+        
+        document.getElementById('ocr-btn').addEventListener('click', () => {
+            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]);
+            processFile('/api/ocr', formData, document.getElementById('ocr-btn'), 'Run OCR Scan', 'Scanning...', 'searchable', currentUploadedFiles[0].name);
         });
-
-        // 5. PROTECT
-        const protectInput = document.getElementById('protect-input');
-        const openPassword = document.getElementById('open-password');
-        const ownerPassword = document.getElementById('owner-password');
-        const disablePrint = document.getElementById('disable-print');
-        const disableCopy = document.getElementById('disable-copy');
-        const disableModify = document.getElementById('disable-modify');
-        const protectBtn = document.getElementById('protect-btn');
-        function checkProtect() {
-            const hasFile = protectInput.files.length > 0;
-            const hasRestrictions = disablePrint.checked || disableCopy.checked || disableModify.checked;
-            let isValid = false;
-            if (hasFile) {
-                if (hasRestrictions) isValid = ownerPassword.value.trim() !== '';
-                else isValid = openPassword.value.trim() !== '' || ownerPassword.value.trim() !== '';
-            }
-            protectBtn.disabled = !isValid;
-        }
-        [protectInput, openPassword, ownerPassword, disablePrint, disableCopy, disableModify].forEach(el => {
-            el.addEventListener('change', checkProtect);
-            el.addEventListener('input', checkProtect);
+        
+        // Setup initial button states
+        ['protect', 'watermark'].forEach(tool => {
+            const inputs = document.getElementById(`tool-${tool}`).querySelectorAll('input');
+            inputs.forEach(input => input.addEventListener('input', () => {
+                const fileInput = document.getElementById(`${tool}-input`);
+                const btn = document.getElementById(`${tool}-btn`);
+                if (tool === 'watermark') {
+                    btn.disabled = !(fileInput.files.length > 0 && document.getElementById('watermark-text').value.trim() !== '');
+                } else if (tool === 'protect') {
+                    const hasRestrictions = document.getElementById('disable-print').checked || document.getElementById('disable-copy').checked || document.getElementById('disable-modify').checked;
+                    let isValid = false;
+                    if (fileInput.files.length > 0) {
+                        if (hasRestrictions) isValid = document.getElementById('owner-password').value.trim() !== '';
+                        else isValid = document.getElementById('open-password').value.trim() !== '' || document.getElementById('owner-password').value.trim() !== '';
+                    }
+                    btn.disabled = !isValid;
+                }
+            }));
         });
-        protectBtn.addEventListener('click', async () => {
-            const file = protectInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('open_password', openPassword.value);
-            formData.append('owner_password', ownerPassword.value);
-            formData.append('disable_print', disablePrint.checked);
-            formData.append('disable_copy', disableCopy.checked);
-            formData.append('disable_modify', disableModify.checked);
-            await processFile('/api/protect', formData, protectBtn, 'Secure PDF', 'Locking...', 'protected', file.name);
-            protectInput.value = ''; openPassword.value = ''; ownerPassword.value = '';
-            disablePrint.checked = false; disableCopy.checked = false; disableModify.checked = false;
-            protectBtn.disabled = true; resetPreview();
-        });
-
-        // 6. OFFICE TO PDF
-        const toPdfInput = document.getElementById('to-pdf-input');
-        const toPdfBtn = document.getElementById('to-pdf-btn');
-        toPdfInput.addEventListener('change', (e) => { toPdfBtn.disabled = e.target.files.length === 0; });
-        toPdfBtn.addEventListener('click', async () => {
-            const file = toPdfInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            await processFile('/api/convert/to-pdf', formData, toPdfBtn, 'Convert to PDF', 'Converting...', baseName, 'converted.pdf');
-            toPdfInput.value = ''; toPdfBtn.disabled = true; resetPreview();
-        });
-
-        // 7. PDF TO WORD
-        const toWordInput = document.getElementById('to-word-input');
-        const toWordBtn = document.getElementById('to-word-btn');
-        toWordInput.addEventListener('change', (e) => { toWordBtn.disabled = e.target.files.length === 0; });
-        toWordBtn.addEventListener('click', async () => {
-            const file = toWordInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            await processFile('/api/convert/to-word', formData, toWordBtn, 'Convert to Word', 'Extracting...', baseName, 'converted.docx');
-            toWordInput.value = ''; toWordBtn.disabled = true; resetPreview();
-        });
-
-        // 8. PDF TO EXCEL
-        const toExcelInput = document.getElementById('to-excel-input');
-        const toExcelBtn = document.getElementById('to-excel-btn');
-        toExcelInput.addEventListener('change', (e) => { toExcelBtn.disabled = e.target.files.length === 0; });
-        toExcelBtn.addEventListener('click', async () => {
-            const file = toExcelInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            await processFile('/api/convert/to-excel', formData, toExcelBtn, 'Convert to Excel', 'Extracting...', baseName, 'converted.xlsx');
-            toExcelInput.value = ''; toExcelBtn.disabled = true; resetPreview();
-        });
-
-        // 9. WATERMARK
-        const watermarkInput = document.getElementById('watermark-input');
-        const watermarkText = document.getElementById('watermark-text');
-        const watermarkBtn = document.getElementById('watermark-btn');
-        function checkWatermark() { watermarkBtn.disabled = !(watermarkInput.files.length > 0 && watermarkText.value.trim() !== ''); }
-        watermarkInput.addEventListener('change', checkWatermark);
-        watermarkText.addEventListener('input', checkWatermark);
-        watermarkBtn.addEventListener('click', async () => {
-            const file = watermarkInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('text', watermarkText.value);
-            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            await processFile('/api/watermark', formData, watermarkBtn, 'Apply Watermark', 'Stamping...', baseName, 'watermarked.pdf');
-            watermarkInput.value = ''; watermarkText.value = ''; watermarkBtn.disabled = true; resetPreview();
-        });
-
-        // 10. SCRUB METADATA
-        const scrubInput = document.getElementById('scrub-input');
-        const scrubBtn = document.getElementById('scrub-btn');
-        scrubInput.addEventListener('change', (e) => { scrubBtn.disabled = e.target.files.length === 0; });
-        scrubBtn.addEventListener('click', async () => {
-            const file = scrubInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            await processFile('/api/scrub', formData, scrubBtn, 'Clean PDF', 'Scrubbing...', baseName, 'clean.pdf');
-            scrubInput.value = ''; scrubBtn.disabled = true; resetPreview();
-        });
-
     </script>
 </body>
 </html>
