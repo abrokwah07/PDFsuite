@@ -496,3 +496,44 @@ async def preview_merge(files: List[UploadFile] = File(...)):
     except Exception as e:
         print(f"--- MERGE PREVIEW ERROR ---: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to preview merge files.")
+
+        # 15. Handle PDF Unlocking (Remove Password)
+@app.post("/api/unlock")
+async def unlock_pdf(file: UploadFile = File(...), password: str = Form(...)):
+    try:
+        contents = await file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
+            temp_in.write(contents)
+            input_path = temp_in.name
+
+        reader = PdfReader(input_path)
+        
+        # Check if the file actually has a password
+        if not reader.is_encrypted:
+            os.unlink(input_path)
+            raise HTTPException(status_code=400, detail="This PDF is not encrypted.")
+
+        # Attempt to decrypt it
+        decrypted = reader.decrypt(password)
+        if decrypted == 0: # 0 means the password failed
+            os.unlink(input_path)
+            raise HTTPException(status_code=401, detail="Incorrect password.")
+
+        # If successful, write the unlocked pages to a new file
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+
+        output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+        writer.write(output_path)
+        writer.close()
+        os.unlink(input_path)
+
+        base_name = os.path.splitext(file.filename)[0]
+        return FileResponse(path=output_path, filename=f"unlocked_{base_name}.pdf", media_type='application/pdf')
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"--- UNLOCK ERROR ---: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to unlock PDF.")
