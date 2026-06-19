@@ -22,17 +22,22 @@
         }
         .processing { animation: pulse-border 2s infinite; pointer-events: none; opacity: 0.7; }
         
-        /* Hide scrollbar for a cleaner app feel */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+        input[type="file"] {
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+        }
     </style>
 </head>
 
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans h-screen flex overflow-hidden transition-colors duration-300">
 
-    <aside class="w-72 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col z-20 transition-colors duration-300">
+    <aside class="w-72 shrink-0 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col z-20 transition-colors duration-300">
         <div class="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800">
             <div class="flex items-center space-x-3">
                 <div class="bg-blue-600 text-white p-1.5 rounded-lg shadow-sm">
@@ -103,7 +108,7 @@
         </div>
     </aside>
 
-    <section class="w-96 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 transition-colors duration-300 shadow-xl overflow-y-auto">
+    <section class="w-96 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 transition-colors duration-300 shadow-xl overflow-y-auto overflow-x-hidden">
         <div class="p-8 h-full flex flex-col" id="tools-container">
 
             <div id="tool-excel" class="tool-section block h-full flex flex-col">
@@ -111,16 +116,16 @@
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Extract tables automatically using structural analysis and OCR fallback.</p>
                 <div class="mb-6 flex-grow">
                     <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Upload Document</label>
-                    <input type="file" id="to-excel-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-lg p-1 transition-colors" onchange="triggerPreview(this)">
+                    <input type="file" id="to-excel-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-lg p-1 transition-colors" onchange="triggerFileSelect(this)">
                 </div>
-                <button id="to-excel-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 dark:hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm" disabled>Convert to Excel</button>
+                <button id="to-excel-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to Excel</button>
             </div>
 
             <div id="tool-word" class="tool-section hidden h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF to Word</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Extract text and layout from a PDF into an editable Word document.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="to-word-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 dark:file:bg-teal-900/20 file:text-teal-700 dark:file:text-teal-400 hover:file:bg-teal-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerPreview(this)">
+                    <input type="file" id="to-word-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 dark:file:bg-teal-900/20 file:text-teal-700 dark:file:text-teal-400 hover:file:bg-teal-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                 </div>
                 <button id="to-word-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-teal-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to Word</button>
             </div>
@@ -138,7 +143,7 @@
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Organize Pages</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Visually rotate or delete pages using the preview grid on the right.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="manipulate-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-50 dark:file:bg-pink-900/20 file:text-pink-700 dark:file:text-pink-400 hover:file:bg-pink-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <input type="file" id="manipulate-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-50 dark:file:bg-pink-900/20 file:text-pink-700 dark:file:text-pink-400 hover:file:bg-pink-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                     <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300">
                         <strong class="block mb-2 text-slate-800 dark:text-white">How to use:</strong>
                         1. Upload a file above.<br>
@@ -153,7 +158,7 @@
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Merge PDFs</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Combine multiple PDF files into a single document.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="merge-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerPreview(this)">
+                    <input type="file" id="merge-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                     <div id="merge-list" class="text-xs text-slate-500 dark:text-slate-400 mt-2 truncate hidden"></div>
                 </div>
                 <button id="merge-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Merge Files</button>
@@ -163,7 +168,7 @@
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Extract Pages</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Pull specific pages out into a new document.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="split-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 dark:file:bg-purple-900/20 file:text-purple-700 dark:file:text-purple-400 hover:file:bg-purple-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <input type="file" id="split-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 dark:file:bg-purple-900/20 file:text-purple-700 dark:file:text-purple-400 hover:file:bg-purple-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                     <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Pages to Extract</label>
                     <input type="text" id="pages-input" placeholder="e.g., 1, 3, 5-7" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500 transition-colors">
                 </div>
@@ -174,7 +179,7 @@
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Compress PDF</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Reduce the file size of your document significantly.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="compress-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 dark:file:bg-green-900/20 file:text-green-700 dark:file:text-green-400 hover:file:bg-green-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerPreview(this)">
+                    <input type="file" id="compress-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 dark:file:bg-green-900/20 file:text-green-700 dark:file:text-green-400 hover:file:bg-green-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                 </div>
                 <button id="compress-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Compress File</button>
             </div>
@@ -183,7 +188,7 @@
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Protect & Restrict</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Add passwords and restrict editing, printing, or copying.</p>
                 <div class="mb-4 flex-grow overflow-y-auto pr-2">
-                    <input type="file" id="protect-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-50 dark:file:bg-red-900/20 file:text-red-700 dark:file:text-red-400 hover:file:bg-red-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <input type="file" id="protect-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-50 dark:file:bg-red-900/20 file:text-red-700 dark:file:text-red-400 hover:file:bg-red-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                     <div class="space-y-3">
                         <input type="password" id="open-password" placeholder="Open Password (Optional)" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-red-500">
                         <input type="password" id="owner-password" placeholder="Owner Password (Req. for locks)" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-red-500">
@@ -208,7 +213,7 @@
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Watermark</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Stamp text diagonally across every page.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="watermark-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 dark:file:bg-orange-900/20 file:text-orange-700 dark:file:text-orange-400 hover:file:bg-orange-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <input type="file" id="watermark-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 dark:file:bg-orange-900/20 file:text-orange-700 dark:file:text-orange-400 hover:file:bg-orange-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                     <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Watermark Text</label>
                     <input type="text" id="watermark-text" placeholder="e.g., CONFIDENTIAL" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500">
                 </div>
@@ -219,7 +224,7 @@
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Scrub Metadata</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Remove hidden tracking data (Author, Date, Software).</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="scrub-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerPreview(this)">
+                    <input type="file" id="scrub-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                 </div>
                 <button id="scrub-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Clean PDF</button>
             </div>
@@ -228,7 +233,7 @@
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Searchable PDF (OCR)</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Use AI to read scanned documents and make text selectable.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="ocr-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 dark:file:bg-yellow-900/20 file:text-yellow-700 dark:file:text-yellow-400 hover:file:bg-yellow-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerPreview(this)">
+                    <input type="file" id="ocr-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 dark:file:bg-yellow-900/20 file:text-yellow-700 dark:file:text-yellow-400 hover:file:bg-yellow-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                     <div id="ocr-warning" class="hidden flex p-4 mb-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-300" role="alert">
                       <svg class="flex-shrink-0 inline w-4 h-4 me-3 mt-[2px]" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20"><path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/></svg>
                       <div><span class="font-medium">Note:</span> This AI process is intensive and may take a few minutes depending on file size.</div>
@@ -240,7 +245,7 @@
         </div>
     </section>
 
-    <section class="flex-grow bg-slate-100/50 dark:bg-slate-950/50 flex flex-col items-center justify-center p-8 relative overflow-hidden transition-colors duration-300">
+    <section class="flex-grow min-w-0 bg-slate-100/50 dark:bg-slate-950/50 flex flex-col items-center justify-center relative overflow-hidden transition-colors duration-300">
         
         <div id="preview-empty" class="text-center transition-opacity duration-300">
             <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white dark:bg-slate-800 shadow-sm mb-6 text-slate-300 dark:text-slate-600">
@@ -255,27 +260,32 @@
             <p class="text-slate-600 dark:text-slate-300 font-medium">Generating preview...</p>
         </div>
 
-        <div id="preview-active" class="hidden flex-col items-center w-full h-full max-h-full">
+        <div id="preview-active" class="hidden flex-col items-center w-full h-full max-h-full pt-8">
             <div class="bg-white dark:bg-slate-800 py-3 px-6 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 mb-6 flex items-center space-x-4 shrink-0">
                 <span id="preview-filename" class="text-sm font-bold text-slate-700 dark:text-slate-200 truncate max-w-[200px]">document.pdf</span>
                 <div class="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
                 <span id="preview-pages" class="text-sm text-slate-500 dark:text-slate-400">0 pages</span>
             </div>
             
-            <div id="preview-limit-warning" class="hidden text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full mb-4 shrink-0">Showing first 30 pages for performance</div>
-            
             <div id="preview-single" class="flex-grow w-full flex justify-center items-start overflow-y-auto pb-8">
                 <img id="preview-image" src="" alt="PDF Preview" class="max-w-full lg:max-w-3xl bg-white shadow-2xl border border-slate-200 dark:border-slate-700 rounded-sm">
             </div>
 
-            <div id="preview-grid" class="hidden flex-grow w-full overflow-y-auto pb-8 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 content-start px-4">
+            <div id="preview-grid" class="hidden flex-grow w-full overflow-y-auto pb-8 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 content-start px-8">
                 </div>
+
+            <div id="pagination-controls" class="hidden flex w-full items-center justify-between mt-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 p-4 shrink-0 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
+                <button id="prev-page-btn" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed" onclick="event.preventDefault(); loadPreviewPages(-30)">← Previous 30</button>
+                <span id="pagination-info" class="text-sm font-semibold text-slate-600 dark:text-slate-400">Pages 1 - 30</span>
+                <button id="next-page-btn" class="px-5 py-2.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-800/50 text-blue-600 dark:text-blue-400 text-sm font-bold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed" onclick="event.preventDefault(); loadPreviewPages(30)">Next 30 →</button></div>
         </div>
     </section>
 
     <script>
         // --- GLOBAL STATE ---
         let currentActiveTool = 'excel';
+        let currentUploadedFile = null;
+        let currentPageStart = 0;
         let loadedPreviewImages = [];
         let pageMods = { rotations: {}, deletions: [] };
 
@@ -341,42 +351,55 @@
             document.getElementById(`tool-${toolName}`).classList.add('block');
             
             // Toggle preview views dynamically
-            if (document.getElementById('preview-active').classList.contains('flex')) {
+            if (!document.getElementById('preview-active').classList.contains('hidden')) {
                 if (toolName === 'manipulate') {
                     document.getElementById('preview-single').classList.add('hidden');
-                    document.getElementById('preview-single').classList.remove('flex');
                     document.getElementById('preview-grid').classList.remove('hidden');
                     document.getElementById('preview-grid').classList.add('grid');
+                    document.getElementById('pagination-controls').classList.remove('hidden');
                     renderPreviewGrid();
                 } else {
                     document.getElementById('preview-grid').classList.add('hidden');
                     document.getElementById('preview-grid').classList.remove('grid');
+                    document.getElementById('pagination-controls').classList.add('hidden');
                     document.getElementById('preview-single').classList.remove('hidden');
-                    document.getElementById('preview-single').classList.add('flex');
                 }
             } else {
                 resetPreview();
             }
         }
 
-        // --- LIVE PREVIEW LOGIC ---
-        async function triggerPreview(inputElement) {
+        // --- LIVE PREVIEW & PAGINATION LOGIC ---
+        function triggerFileSelect(inputElement) {
             if (!inputElement.files || inputElement.files.length === 0) {
                 resetPreview();
                 return;
             }
+            currentUploadedFile = inputElement.files[0];
+            currentPageStart = 0; // Reset to page 1 on new file upload
+            pageMods = { rotations: {}, deletions: [] }; // Clear modifications
+            fetchPreviewData();
+        }
 
+        async function loadPreviewPages(offset) {
+            if (!currentUploadedFile) return;
+            currentPageStart += offset;
+            if (currentPageStart < 0) currentPageStart = 0;
+            await fetchPreviewData();
+        }
+
+        async function fetchPreviewData() {
             document.getElementById('preview-empty').classList.add('hidden');
             document.getElementById('preview-active').classList.add('hidden');
             document.getElementById('preview-loading').classList.remove('hidden');
 
-            const file = inputElement.files[0];
             const formData = new FormData();
-            formData.append("file", file);
+            formData.append("file", currentUploadedFile);
+            formData.append("page_start", currentPageStart);
 
             try {
-                if (!file.name.toLowerCase().endsWith('.pdf')) {
-                    showPreviewWithoutImage(file.name, "Office Document");
+                if (!currentUploadedFile.name.toLowerCase().endsWith('.pdf')) {
+                    showPreviewWithoutImage(currentUploadedFile.name, "Office Document");
                     return;
                 }
 
@@ -387,12 +410,13 @@
                     document.getElementById('preview-filename').innerText = data.filename;
                     document.getElementById('preview-pages').innerText = `${data.total_pages} page(s)`;
                     
-                    if(data.limited) document.getElementById('preview-limit-warning').classList.remove('hidden');
-                    else document.getElementById('preview-limit-warning').classList.add('hidden');
+                    // Update Pagination UI
+                    document.getElementById('pagination-info').innerText = `Pages ${data.current_start + 1} - ${data.current_end} of ${data.total_pages}`;
+                    document.getElementById('prev-page-btn').disabled = data.current_start === 0;
+                    document.getElementById('next-page-btn').disabled = !data.has_more;
 
                     // Store images globally
                     loadedPreviewImages = data.preview_images || [];
-                    pageMods = { rotations: {}, deletions: [] };
 
                     // Display single image fallback
                     if (loadedPreviewImages.length > 0) {
@@ -402,16 +426,16 @@
                     // Render Grid if on manipulate tool
                     if (currentActiveTool === 'manipulate') {
                         document.getElementById('preview-single').classList.add('hidden');
-                        document.getElementById('preview-single').classList.remove('flex');
                         document.getElementById('preview-grid').classList.remove('hidden');
                         document.getElementById('preview-grid').classList.add('grid');
+                        document.getElementById('pagination-controls').classList.remove('hidden');
                         renderPreviewGrid();
                         document.getElementById('manipulate-btn').disabled = false;
                     } else {
                         document.getElementById('preview-grid').classList.add('hidden');
                         document.getElementById('preview-grid').classList.remove('grid');
+                        document.getElementById('pagination-controls').classList.add('hidden');
                         document.getElementById('preview-single').classList.remove('hidden');
-                        document.getElementById('preview-single').classList.add('flex');
                     }
 
                     document.getElementById('preview-loading').classList.add('hidden');
@@ -433,8 +457,11 @@
             const isManipulateTool = (currentActiveTool === 'manipulate');
 
             loadedPreviewImages.forEach((imgSrc, index) => {
-                const rotation = pageMods.rotations[index] || 0;
-                const isDeleted = pageMods.deletions.includes(index);
+                // Calculate the absolute page number based on pagination offset
+                const absoluteIndex = currentPageStart + index;
+                
+                const rotation = pageMods.rotations[absoluteIndex] || 0;
+                const isDeleted = pageMods.deletions.includes(absoluteIndex);
                 
                 const card = document.createElement('div');
                 card.className = `relative flex flex-col items-center transition-all ${isDeleted ? 'opacity-30 grayscale' : ''}`;
@@ -445,8 +472,8 @@
                 img.style.transform = `rotate(${rotation}deg)`;
                 
                 const pageNum = document.createElement('div');
-                pageNum.className = 'mt-2 text-xs font-semibold text-slate-500';
-                pageNum.innerText = `Page ${index + 1}`;
+                pageNum.className = 'mt-2 text-xs font-bold text-slate-500';
+                pageNum.innerText = `Page ${absoluteIndex + 1}`;
 
                 card.appendChild(img);
                 card.appendChild(pageNum);
@@ -459,7 +486,7 @@
                     rotBtn.innerHTML = '↻';
                     rotBtn.className = 'w-8 h-8 flex items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-slate-700';
                     rotBtn.onclick = () => {
-                        pageMods.rotations[index] = (pageMods.rotations[index] || 0) + 90;
+                        pageMods.rotations[absoluteIndex] = (pageMods.rotations[absoluteIndex] || 0) + 90;
                         renderPreviewGrid();
                     };
                     
@@ -467,8 +494,8 @@
                     delBtn.innerHTML = isDeleted ? '↩️' : '🗑️';
                     delBtn.className = 'w-8 h-8 flex items-center justify-center rounded bg-red-100 hover:bg-red-200 text-red-600';
                     delBtn.onclick = () => {
-                        if (isDeleted) pageMods.deletions = pageMods.deletions.filter(i => i !== index);
-                        else pageMods.deletions.push(index);
+                        if (isDeleted) pageMods.deletions = pageMods.deletions.filter(i => i !== absoluteIndex);
+                        else pageMods.deletions.push(absoluteIndex);
                         renderPreviewGrid();
                     };
 
@@ -489,12 +516,14 @@
             document.getElementById('preview-filename').innerText = filename;
             document.getElementById('preview-pages').innerText = type;
             document.getElementById('preview-image').src = ""; 
-            document.getElementById('preview-active').classList.remove('hidden');
-            document.getElementById('preview-active').classList.add('flex');
-            document.getElementById('preview-single').classList.add('flex');
-            document.getElementById('preview-single').classList.remove('hidden');
+            
             document.getElementById('preview-grid').classList.add('hidden');
             document.getElementById('preview-grid').classList.remove('grid');
+            document.getElementById('pagination-controls').classList.add('hidden');
+            document.getElementById('preview-single').classList.remove('hidden');
+            
+            document.getElementById('preview-active').classList.remove('hidden');
+            document.getElementById('preview-active').classList.add('flex');
         }
 
         function resetPreview() {
@@ -502,6 +531,7 @@
             document.getElementById('preview-active').classList.add('hidden');
             document.getElementById('preview-active').classList.remove('flex');
             document.getElementById('preview-empty').classList.remove('hidden');
+            currentUploadedFile = null;
             loadedPreviewImages = [];
             pageMods = { rotations: {}, deletions: [] };
         }
