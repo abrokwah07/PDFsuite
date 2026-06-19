@@ -332,7 +332,8 @@ async def convert_to_excel(file: UploadFile = File(...)):
                     for page in pdf.pages:
                         tables = page.extract_tables({"vertical_strategy": "text", "horizontal_strategy": "text"})
                         for table in tables:
-                            df = pd.DataFrame(table[1:], columns=table[0])
+                            # Pass the entire table as data to avoid header mismatches
+                            df = pd.DataFrame(table)
                             all_tables.append(df)
             except Exception as e:
                 print(f"pdfplumber Strategy Failed: {e}")
@@ -347,7 +348,6 @@ async def convert_to_excel(file: UploadFile = File(...)):
                 
                 # Extract using the new text layer
                 with pdfplumber.open(ocr_path) as pdf:
-                    # Give OCR text slightly wider tolerances
                     settings = {
                         "vertical_strategy": "text", 
                         "horizontal_strategy": "text",
@@ -357,7 +357,7 @@ async def convert_to_excel(file: UploadFile = File(...)):
                     for page in pdf.pages:
                         tables = page.extract_tables(settings)
                         for table in tables:
-                            df = pd.DataFrame(table[1:], columns=table[0])
+                            df = pd.DataFrame(table)
                             all_tables.append(df)
             except Exception as e:
                 print(f"OCR Rescue Failed: {e}")
@@ -370,17 +370,28 @@ async def convert_to_excel(file: UploadFile = File(...)):
             os.unlink(input_path)
             raise HTTPException(status_code=400, detail="Could not detect tables, even after OCR.")
 
-        # Save to Excel
-        with pd.ExcelWriter(output_xlsx, engine='openpyxl') as writer:
-            for i, df in enumerate(all_tables):
-                df.to_excel(writer, sheet_name=f"Table_{i+1}", index=False)
+        # --- THE FIX: Merge all tables into a SINGLE sheet ---
+        
+        # 1. Strip column names and set them to standard integers (0, 1, 2...)
+        # This ensures tables from page 1 stack perfectly on tables from page 2
+        for i in range(len(all_tables)):
+            all_tables[i].columns = range(all_tables[i].shape[1])
+            
+        # 2. Combine them all vertically
+        master_df = pd.concat(all_tables, ignore_index=True)
+        
+        # 3. Clean up: Drop rows that are completely empty
+        master_df.dropna(how='all', inplace=True)
+
+        # 4. Save to a single sheet
+        master_df.to_excel(output_xlsx, index=False, header=False, sheet_name="Master_Data")
 
         os.unlink(input_path)
         
         base_name = os.path.splitext(file.filename)[0]
         return FileResponse(
             path=output_xlsx, 
-            filename=f"{base_name}.xlsx", 
+            filename=f"{base_name}_Master.xlsx", 
             media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         
@@ -465,9 +476,9 @@ async def scrub_metadata(file: UploadFile = File(...)):
     
     import json
 
-# 12. Handle Document Preview (Multi-Page Grid)
+# 12. Handle Document Preview (Multi-Page Grid with Pagination)
 @app.post("/api/preview")
-async def preview_pdf(file: UploadFile = File(...)):
+async def preview_pdf(file: UploadFile = File(...), page_start: int = Form(0)):
     try:
         contents = await file.read()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
@@ -477,12 +488,14 @@ async def preview_pdf(file: UploadFile = File(...)):
         preview_images = []
         with pdfplumber.open(input_path) as pdf:
             total_pages = len(pdf.pages)
-            # Cap at 30 pages to prevent the server from freezing on huge books
-            max_pages = min(total_pages, 30)
             
-            for i in range(max_pages):
+            # Ensure start doesn't exceed total pages
+            start = min(page_start, total_pages)
+            # Grab up to 30 pages from the start point
+            end = min(start + 30, total_pages)
+            
+            for i in range(start, end):
                 page = pdf.pages[i]
-                # Resolution 48 is low-res, perfect for fast-loading UI thumbnails
                 img = page.to_image(resolution=48) 
                 buffer = io.BytesIO()
                 img.original.save(buffer, format="JPEG")
@@ -495,7 +508,9 @@ async def preview_pdf(file: UploadFile = File(...)):
             "filename": file.filename,
             "total_pages": total_pages,
             "preview_images": preview_images,
-            "limited": total_pages > 30
+            "current_start": start,
+            "current_end": end,
+            "has_more": end < total_pages
         })
 
     except Exception as e:
