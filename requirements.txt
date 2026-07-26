@@ -3,6 +3,7 @@ fastapi>=0.115.0,<1.0
 uvicorn[standard]>=0.30.0,<1.0
 starlette>=0.40.0,<1.0
 python-multipart>=0.0.9,<1.0
+python-dotenv>=1.0.0,<2.0
 
 # PDF / documents
 pypdf>=5.0.0,<7.0
@@ -18,7 +19,9 @@ pymupdf>=1.24.0,<2.0
 # Tables / data
 pandas>=2.2.0,<3.0
 openpyxl>=3.1.0,<4.0
-camelot-py[cv]>=0.11.0,<1.0
+# Note: camelot-py[cv] pulls pdftopng which lacks aarch64 wheels (Apple Silicon / ARM Docker).
+# Base camelot is enough; pdfplumber remains the reliable fallback for table extraction.
+camelot-py>=0.11.0,<1.0
 
 # Tests (optional in production images — kept lightweight)
 httpx>=0.27.0,<1.0

@@ -1,21 +1,29 @@
 services:
   pdf-app:
     build: .
-    image: local-pdf-suite:1.1.0
+    image: local-pdf-suite:1.2.0
     container_name: local-pdf-suite
     ports:
       - "${HOST_PORT:-8000}:8000"
     environment:
       APP_ENV: production
       APP_NAME: Local PDF Suite
-      APP_VERSION: "1.1.0"
+      APP_VERSION: "1.2.0"
       LOG_LEVEL: INFO
+      RUNNING_IN_DOCKER: "1"
+      HOST: "0.0.0.0"
       MAX_UPLOAD_BYTES: "104857600"
       MAX_FILES_PER_REQUEST: "50"
+      MAX_OCR_PAGES: "200"
+      MAX_CONCURRENT_JOBS: "2"
+      RATE_LIMIT_PER_MINUTE: "120"
       SUBPROCESS_TIMEOUT_SECONDS: "180"
       TEMP_DIR: /tmp/pdfsuite
       # Restrict CORS in enterprise deployments, e.g. https://pdf.internal.company
       ALLOW_ORIGINS: "*"
+      # Optional: set to require API key on /api/*
+      # API_KEY: "${API_KEY:-}"
+      FORWARDED_ALLOW_IPS: "127.0.0.1"
     restart: unless-stopped
     read_only: true
     tmpfs:

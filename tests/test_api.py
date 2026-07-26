@@ -322,3 +322,88 @@ def test_sanitize_filename():
     assert sanitize_filename("../../etc/passwd") == "passwd"
     assert sanitize_filename("invoice (final).pdf") == "invoice (final).pdf"
     assert sanitize_filename(None) == "document"
+
+
+def test_parse_page_spec():
+    from app.security import parse_page_spec
+
+    assert parse_page_spec("1,3,5-7") == {0, 2, 4, 5, 6}
+    try:
+        parse_page_spec("not-a-page")
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_password_too_long(client: TestClient):
+    pdf = _make_pdf_bytes()
+    long_pw = "x" * 200
+    res = client.post(
+        "/api/protect",
+        files={"file": ("doc.pdf", pdf, "application/pdf")},
+        data={"open_password": long_pw, "owner_password": ""},
+    )
+    assert res.status_code == 400
+    assert "too long" in res.json()["detail"].lower()
+
+
+def test_ready_includes_features(client: TestClient):
+    res = client.get("/ready")
+    assert res.status_code == 200
+    body = res.json()
+    assert "features" in body
+    assert "limits" in body
+    assert "max_upload_mb" in body["limits"]
+
+
+def test_zip_member_safety():
+    from app.security import is_safe_zip_member
+
+    assert is_safe_zip_member("word/document.xml") is True
+    assert is_safe_zip_member("../../etc/passwd") is False
+    assert is_safe_zip_member("/etc/passwd") is False
+
+
+def test_api_key_enforcement(monkeypatch):
+    """When API_KEY is set, /api/* requires the key; public routes stay open."""
+    import importlib
+
+    monkeypatch.setenv("API_KEY", "test-secret-key")
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("ENABLE_OCR", "false")
+    monkeypatch.setenv("ENABLE_LIBREOFFICE", "false")
+    monkeypatch.setenv("ENABLE_GHOSTSCRIPT", "false")
+    monkeypatch.setenv("ENABLE_CAMELOT", "false")
+
+    from app.config import clear_settings_cache
+
+    clear_settings_cache()
+
+    import main as main_mod
+
+    importlib.reload(main_mod)
+
+    with TestClient(main_mod.app) as c:
+        deny = c.post(
+            "/api/merge",
+            files=[("files", ("a.pdf", _make_pdf_bytes(), "application/pdf"))],
+        )
+        assert deny.status_code == 401
+
+        ok = c.post(
+            "/api/merge",
+            files=[
+                ("files", ("a.pdf", _make_pdf_bytes(), "application/pdf")),
+                ("files", ("b.pdf", _make_pdf_bytes(), "application/pdf")),
+            ],
+            headers={"X-API-Key": "test-secret-key"},
+        )
+        assert ok.status_code == 200, ok.text
+
+        health = c.get("/health")
+        assert health.status_code == 200
+
+    # Restore clean app without API key for remaining tests
+    monkeypatch.delenv("API_KEY", raising=False)
+    clear_settings_cache()
+    importlib.reload(main_mod)

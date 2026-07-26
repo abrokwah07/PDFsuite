@@ -6,7 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     APP_ENV=production \
-    PORT=8000
+    APP_VERSION=1.2.0 \
+    PORT=8000 \
+    HOST=0.0.0.0 \
+    RUNNING_IN_DOCKER=1 \
+    FORWARDED_ALLOW_IPS=127.0.0.1
 
 WORKDIR /app
 
@@ -52,4 +56,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT}/health" || exit 1
 
 # Single worker is safer for memory-heavy PDF jobs; scale with replicas if needed
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "uvicorn main:app --host ${HOST} --port ${PORT} --proxy-headers --forwarded-allow-ips=${FORWARDED_ALLOW_IPS}"]

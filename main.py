@@ -2,7 +2,8 @@
 Local PDF Suite — FastAPI backend.
 
 All document processing runs locally. Uploads are size-checked, filenames are
-sanitized, subprocesses are timed out, and temporary files are cleaned up.
+sanitized, subprocesses are timed out, jobs are concurrency-limited, and
+temporary files are cleaned up.
 """
 
 from __future__ import annotations
@@ -13,9 +14,7 @@ import json
 import logging
 import os
 import shutil
-import subprocess
 import time
-import uuid
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -32,23 +31,28 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse
 from PIL import Image
 from pypdf import PdfReader, PdfWriter
 from pypdf.constants import UserAccessPermissions
 from reportlab.pdfgen import canvas
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import Settings, get_settings
+from app.job_limit import JobLimiter, RateLimiter
+from app.middleware import RequestContextMiddleware
+from app.pdf_editor import apply_edits, inspect_page
 from app.security import (
     OFFICE_COMPRESS_EXTENSIONS,
     OFFICE_TO_PDF_EXTENSIONS,
     PDF_EXTENSIONS,
+    assert_zip_safe,
+    is_safe_zip_member,
+    parse_page_spec,
     read_upload,
-    sanitize_filename,
     validate_file_count,
+    validate_password,
 )
-from app.pdf_editor import apply_edits, inspect_page
+from app.subprocess_util import run_subprocess
 from app.tempfiles import (
     file_response,
     make_temp_dir,
@@ -94,82 +98,12 @@ def _which(cmd: str) -> str | None:
     return shutil.which(cmd)
 
 
-def _run_subprocess(
-    command: list[str],
-    settings: Settings,
-    *,
-    label: str,
-) -> subprocess.CompletedProcess[str]:
-    try:
-        return subprocess.run(
-            command,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=settings.subprocess_timeout_seconds,
-        )
-    except subprocess.TimeoutExpired as exc:
-        logger.error("%s timed out after %ss", label, settings.subprocess_timeout_seconds)
-        raise HTTPException(
-            status_code=504,
-            detail=f"{label} timed out. Try a smaller file or raise SUBPROCESS_TIMEOUT_SECONDS.",
-        ) from exc
-    except FileNotFoundError as exc:
-        logger.error("%s binary missing: %s", label, command[0])
-        raise HTTPException(
-            status_code=503,
-            detail=f"{label} is not installed on this server.",
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        stderr = (exc.stderr or "")[:500]
-        logger.error("%s failed: %s", label, stderr)
-        raise HTTPException(status_code=500, detail=f"{label} failed.") from exc
+def _settings(request: Request) -> Settings:
+    return request.app.state.settings
 
 
-class RequestContextMiddleware(BaseHTTPMiddleware):
-    """Attach request IDs, security headers, and structured access logs."""
-
-    async def dispatch(self, request: Request, call_next):
-        settings: Settings = request.app.state.settings
-        request_id = request.headers.get(settings.request_id_header) or str(uuid.uuid4())
-        request.state.request_id = request_id
-        started = time.perf_counter()
-
-        try:
-            response = await call_next(request)
-        except Exception:
-            logger.exception("Unhandled error request_id=%s path=%s", request_id, request.url.path)
-            raise
-
-        elapsed_ms = (time.perf_counter() - started) * 1000
-        response.headers["X-Request-ID"] = request_id
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "SAMEORIGIN"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        response.headers["Cache-Control"] = "no-store"
-        # Local tool: do not allow embedding of third-party scripts beyond our own page.
-        # Tailwind CDN is used by index.html; keep a deliberate CSP for that.
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: blob:; "
-            "connect-src 'self'; "
-            "frame-ancestors 'self'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
-        )
-
-        logger.info(
-            "request_id=%s method=%s path=%s status=%s duration_ms=%.1f",
-            request_id,
-            request.method,
-            request.url.path,
-            response.status_code,
-            elapsed_ms,
-        )
-        return response
+def _limiter(request: Request) -> JobLimiter:
+    return request.app.state.job_limiter
 
 
 @asynccontextmanager
@@ -181,9 +115,11 @@ async def lifespan(app: FastAPI):
     app.state.gs_path = _which("gs")
     app.state.libreoffice_path = _which("libreoffice") or _which("soffice")
     app.state.tesseract_path = _which("tesseract")
+    app.state.job_limiter = JobLimiter(settings.max_concurrent_jobs)
+    app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute)
 
     logger.info(
-        "Starting %s v%s env=%s gs=%s libreoffice=%s tesseract=%s ocrmypdf=%s camelot=%s",
+        "Starting %s v%s env=%s gs=%s libreoffice=%s tesseract=%s ocrmypdf=%s camelot=%s api_key=%s",
         settings.app_name,
         settings.app_version,
         settings.environment,
@@ -192,6 +128,7 @@ async def lifespan(app: FastAPI):
         bool(app.state.tesseract_path),
         ocrmypdf is not None,
         camelot is not None,
+        bool(settings.api_key),
     )
     yield
     logger.info("Shutting down %s", settings.app_name)
@@ -208,6 +145,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Trusted hosts (optional hardening when set)
+    if settings.trusted_hosts:
+        from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(settings.trusted_hosts))
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.allow_origins),
@@ -221,10 +164,13 @@ def create_app() -> FastAPI:
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
         request_id = getattr(request.state, "request_id", None)
+        headers = {"X-Request-ID": request_id or ""}
+        if exc.headers:
+            headers.update(exc.headers)
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail, "request_id": request_id},
-            headers={"X-Request-ID": request_id or ""},
+            headers=headers,
         )
 
     @app.exception_handler(Exception)
@@ -246,15 +192,28 @@ def create_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def read_index(request: Request):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         if not settings.index_html.is_file():
             raise HTTPException(status_code=500, detail="Frontend index.html is missing.")
         html = settings.index_html.read_text(encoding="utf-8")
         return HTMLResponse(content=html)
 
+    @app.get("/favicon.ico")
+    async def favicon():
+        # Tiny inline SVG favicon (avoids 404 noise in browser consoles)
+        svg = (
+            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"
+            "<rect width='32' height='32' rx='6' fill='#2563eb'/>"
+            "<path d='M9 8h9l5 5v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z' fill='white'/>"
+            "</svg>"
+        )
+        from fastapi.responses import Response
+
+        return Response(content=svg, media_type="image/svg+xml")
+
     @app.get("/health")
     async def health(request: Request):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         return {
             "status": "ok",
             "service": settings.app_name,
@@ -265,7 +224,7 @@ def create_app() -> FastAPI:
     @app.get("/ready")
     async def ready(request: Request):
         """Readiness: core Python PDF stack must work; system tools reported."""
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         checks = {
             "index_html": settings.index_html.is_file(),
             "ghostscript": bool(request.app.state.gs_path) if settings.enable_ghostscript else True,
@@ -275,13 +234,37 @@ def create_app() -> FastAPI:
             "ocrmypdf": (ocrmypdf is not None and bool(request.app.state.tesseract_path))
             if settings.enable_ocr
             else True,
+            "pymupdf": True,  # soft — edit endpoints self-check
         }
-        # Core always required
+        try:
+            import fitz  # noqa: F401
+
+            checks["pymupdf"] = True
+        except ImportError:
+            checks["pymupdf"] = False
+
         core_ok = checks["index_html"]
         status = "ready" if core_ok else "degraded"
         return JSONResponse(
             status_code=200 if core_ok else 503,
-            content={"status": status, "checks": checks},
+            content={
+                "status": status,
+                "checks": checks,
+                "features": {
+                    "ocr": settings.enable_ocr and checks["ocrmypdf"],
+                    "ghostscript": settings.enable_ghostscript and checks["ghostscript"],
+                    "libreoffice": settings.enable_libreoffice and checks["libreoffice"],
+                    "camelot": settings.enable_camelot and camelot is not None,
+                    "edit": checks["pymupdf"],
+                    "api_key_required": bool(settings.api_key),
+                },
+                "limits": {
+                    "max_upload_mb": settings.max_upload_bytes // (1024 * 1024),
+                    "max_files_per_request": settings.max_files_per_request,
+                    "max_ocr_pages": settings.max_ocr_pages,
+                    "max_concurrent_jobs": settings.max_concurrent_jobs,
+                },
+            },
         )
 
     # ------------------------------------------------------------------
@@ -294,14 +277,14 @@ def create_app() -> FastAPI:
         background: BackgroundTasks,
         files: List[UploadFile] = File(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         validate_file_count(len(files), settings)
 
         merger = PdfWriter()
         temps: list[str] = []
         try:
             for upload in files:
-                name, data = await read_upload(
+                _name, data = await read_upload(
                     upload, settings, allowed_extensions=PDF_EXTENSIONS
                 )
                 path = write_bytes(data, ".pdf", settings)
@@ -321,10 +304,12 @@ def create_app() -> FastAPI:
                 background=background,
             )
         except HTTPException:
+            merger.close()
             for path in temps:
                 safe_unlink(path)
             raise
         except Exception as exc:
+            merger.close()
             for path in temps:
                 safe_unlink(path)
             logger.exception("merge failed")
@@ -337,7 +322,7 @@ def create_app() -> FastAPI:
         files: List[UploadFile] = File(...),
         level: str = Form("medium"),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         validate_file_count(len(files), settings)
 
         if not settings.enable_ghostscript or not request.app.state.gs_path:
@@ -353,30 +338,31 @@ def create_app() -> FastAPI:
         inputs: list[str] = []
 
         try:
-            for upload in files:
-                name, data = await read_upload(
-                    upload, settings, allowed_extensions=PDF_EXTENSIONS
-                )
-                input_path = write_bytes(data, ".pdf", settings)
-                inputs.append(input_path)
-                output_path = make_temp_path(".pdf", settings)
+            async with _limiter(request).slot(label="compression job"):
+                for upload in files:
+                    name, data = await read_upload(
+                        upload, settings, allowed_extensions=PDF_EXTENSIONS
+                    )
+                    input_path = write_bytes(data, ".pdf", settings)
+                    inputs.append(input_path)
+                    output_path = make_temp_path(".pdf", settings)
 
-                _run_subprocess(
-                    [
-                        request.app.state.gs_path,
-                        "-sDEVICE=pdfwrite",
-                        "-dCompatibilityLevel=1.4",
-                        f"-dPDFSETTINGS={pdf_setting}",
-                        "-dNOPAUSE",
-                        "-dQUIET",
-                        "-dBATCH",
-                        f"-sOutputFile={output_path}",
-                        input_path,
-                    ],
-                    settings,
-                    label="Ghostscript compression",
-                )
-                processed.append((name, output_path))
+                    run_subprocess(
+                        [
+                            request.app.state.gs_path,
+                            "-sDEVICE=pdfwrite",
+                            "-dCompatibilityLevel=1.4",
+                            f"-dPDFSETTINGS={pdf_setting}",
+                            "-dNOPAUSE",
+                            "-dQUIET",
+                            "-dBATCH",
+                            f"-sOutputFile={output_path}",
+                            input_path,
+                        ],
+                        settings,
+                        label="Ghostscript compression",
+                    )
+                    processed.append((name, output_path))
 
             if len(processed) == 1:
                 orig_name, out_path = processed[0]
@@ -420,31 +406,12 @@ def create_app() -> FastAPI:
         file: UploadFile = File(...),
         pages: str = Form(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
 
         try:
-            page_indices: set[int] = set()
-            for part in pages.replace(" ", "").split(","):
-                if not part:
-                    continue
-                if "-" in part:
-                    start_s, end_s = part.split("-", 1)
-                    start, end = int(start_s), int(end_s)
-                    if start > end or start < 1:
-                        raise ValueError("Invalid page range")
-                    for p in range(start, end + 1):
-                        page_indices.add(p - 1)
-                else:
-                    page = int(part)
-                    if page < 1:
-                        raise ValueError("Invalid page number")
-                    page_indices.add(page - 1)
-            if not page_indices:
-                raise HTTPException(status_code=400, detail="No pages specified.")
-        except HTTPException:
-            raise
-        except Exception as exc:
+            page_indices = parse_page_spec(pages)
+        except ValueError as exc:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid page specification. Use formats like 1,3,5-7.",
@@ -487,7 +454,7 @@ def create_app() -> FastAPI:
         background: BackgroundTasks,
         file: UploadFile = File(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         if not settings.enable_ocr or ocrmypdf is None:
             raise HTTPException(status_code=503, detail="OCR is not available.")
 
@@ -495,7 +462,23 @@ def create_app() -> FastAPI:
         input_path = write_bytes(data, ".pdf", settings)
         output_path = make_temp_path(".pdf", settings)
         try:
-            ocrmypdf.ocr(input_path, output_path, force_ocr=True, progress_bar=False)
+            # Cap pages to avoid multi-hour / multi-GB OCR jobs
+            try:
+                page_count = len(PdfReader(input_path).pages)
+            except Exception:
+                page_count = 0
+            if page_count > settings.max_ocr_pages:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"PDF has {page_count} pages; OCR is limited to "
+                        f"{settings.max_ocr_pages} pages. Split the document first."
+                    ),
+                )
+
+            async with _limiter(request).slot(label="OCR job"):
+                ocrmypdf.ocr(input_path, output_path, force_ocr=True, progress_bar=False)
+
             return file_response(
                 output_path,
                 filename=f"searchable_{name}",
@@ -503,6 +486,10 @@ def create_app() -> FastAPI:
                 background=background,
                 extra_cleanup=[input_path],
             )
+        except HTTPException:
+            safe_unlink(input_path)
+            safe_unlink(output_path)
+            raise
         except Exception as exc:
             safe_unlink(input_path)
             safe_unlink(output_path)
@@ -520,7 +507,13 @@ def create_app() -> FastAPI:
         disable_copy: bool = Form(False),
         disable_modify: bool = Form(False),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
+        open_password = validate_password(
+            open_password, settings, field="open_password"
+        )
+        owner_password = validate_password(
+            owner_password, settings, field="owner_password"
+        )
         if not open_password and not owner_password:
             raise HTTPException(
                 status_code=400,
@@ -556,10 +549,12 @@ def create_app() -> FastAPI:
                 )
 
             final_owner = owner_password if owner_password else open_password
+            # AES-256 when supported by pypdf
             writer.encrypt(
                 user_password=open_password,
                 owner_password=final_owner,
                 permissions_flag=permissions,
+                algorithm="AES-256",
             )
 
             output_path = make_temp_path(".pdf", settings)
@@ -587,48 +582,51 @@ def create_app() -> FastAPI:
         background: BackgroundTasks,
         file: UploadFile = File(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         if not settings.enable_libreoffice or not request.app.state.libreoffice_path:
             raise HTTPException(status_code=503, detail="LibreOffice is not available.")
 
         name, data = await read_upload(
             file, settings, allowed_extensions=OFFICE_TO_PDF_EXTENSIONS, label="Office document"
         )
+        # OOXML path safety for modern Office files
+        if Path(name).suffix.lower() in {".docx", ".xlsx", ".pptx"}:
+            assert_zip_safe(data, settings, label="Office document")
+
         temp_dir = make_temp_dir(settings)
         try:
-            # Sanitized basename only — prevents path traversal
-            input_path = os.path.join(temp_dir, name)
-            with open(input_path, "wb") as handle:
-                handle.write(data)
+            async with _limiter(request).slot(label="conversion job"):
+                input_path = os.path.join(temp_dir, name)
+                with open(input_path, "wb") as handle:
+                    handle.write(data)
 
-            _run_subprocess(
-                [
-                    request.app.state.libreoffice_path,
-                    "--headless",
-                    "--nologo",
-                    "--nofirststartwizard",
-                    "--convert-to",
-                    "pdf",
-                    "--outdir",
-                    temp_dir,
-                    input_path,
-                ],
-                settings,
-                label="LibreOffice conversion",
-            )
+                run_subprocess(
+                    [
+                        request.app.state.libreoffice_path,
+                        "--headless",
+                        "--nologo",
+                        "--nofirststartwizard",
+                        "--convert-to",
+                        "pdf",
+                        "--outdir",
+                        temp_dir,
+                        input_path,
+                    ],
+                    settings,
+                    label="LibreOffice conversion",
+                )
 
-            base_name = Path(name).stem
-            output_pdf = os.path.join(temp_dir, f"{base_name}.pdf")
-            if not os.path.isfile(output_pdf):
-                # LibreOffice sometimes normalizes names
-                pdfs = list(Path(temp_dir).glob("*.pdf"))
-                if not pdfs:
-                    raise HTTPException(status_code=500, detail="Conversion produced no PDF.")
-                output_pdf = str(pdfs[0])
+                base_name = Path(name).stem
+                output_pdf = os.path.join(temp_dir, f"{base_name}.pdf")
+                if not os.path.isfile(output_pdf):
+                    pdfs = list(Path(temp_dir).glob("*.pdf"))
+                    if not pdfs:
+                        raise HTTPException(status_code=500, detail="Conversion produced no PDF.")
+                    output_pdf = str(pdfs[0])
 
-            # Copy out of the temp dir so we can delete the whole dir after send
-            final_path = make_temp_path(".pdf", settings)
-            shutil.copy2(output_pdf, final_path)
+                final_path = make_temp_path(".pdf", settings)
+                shutil.copy2(output_pdf, final_path)
+
             schedule_cleanup(background, temp_dir)
             return file_response(
                 final_path,
@@ -650,7 +648,7 @@ def create_app() -> FastAPI:
         background: BackgroundTasks,
         file: UploadFile = File(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         if Converter is None:
             raise HTTPException(status_code=503, detail="pdf2docx is not installed.")
 
@@ -658,11 +656,12 @@ def create_app() -> FastAPI:
         input_path = write_bytes(data, ".pdf", settings)
         output_docx = make_temp_path(".docx", settings)
         try:
-            cv = Converter(input_path)
-            try:
-                cv.convert(output_docx)
-            finally:
-                cv.close()
+            async with _limiter(request).slot(label="conversion job"):
+                cv = Converter(input_path)
+                try:
+                    cv.convert(output_docx)
+                finally:
+                    cv.close()
 
             base_name = Path(name).stem
             return file_response(
@@ -672,6 +671,10 @@ def create_app() -> FastAPI:
                 background=background,
                 extra_cleanup=[input_path],
             )
+        except HTTPException:
+            safe_unlink(input_path)
+            safe_unlink(output_docx)
+            raise
         except Exception as exc:
             safe_unlink(input_path)
             safe_unlink(output_docx)
@@ -684,7 +687,7 @@ def create_app() -> FastAPI:
         background: BackgroundTasks,
         files: List[UploadFile] = File(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         if pd is None:
             raise HTTPException(status_code=503, detail="pandas is not installed.")
 
@@ -693,74 +696,75 @@ def create_app() -> FastAPI:
         temps: list[str] = []
 
         try:
-            for upload in files:
-                name, data = await read_upload(
-                    upload, settings, allowed_extensions=PDF_EXTENSIONS
-                )
-                input_path = write_bytes(data, ".pdf", settings)
-                temps.append(input_path)
-                all_tables: list = []
-
-                if settings.enable_camelot and camelot is not None:
-                    try:
-                        tables = camelot.read_pdf(input_path, pages="all", flavor="stream")
-                        for table in tables:
-                            if not table.df.empty:
-                                all_tables.append(table.df)
-                    except Exception as exc:
-                        logger.info("Camelot extraction fallback: %s", exc)
-
-                if not all_tables:
-                    try:
-                        with pdfplumber.open(input_path) as pdf:
-                            for page in pdf.pages:
-                                tables = page.extract_tables(
-                                    {
-                                        "vertical_strategy": "text",
-                                        "horizontal_strategy": "text",
-                                    }
-                                )
-                                for table in tables or []:
-                                    all_tables.append(pd.DataFrame(table))
-                    except Exception as exc:
-                        logger.info("pdfplumber extraction fallback: %s", exc)
-
-                if not all_tables and settings.enable_ocr and ocrmypdf is not None:
-                    ocr_path = make_temp_path(".pdf", settings)
-                    temps.append(ocr_path)
-                    try:
-                        ocrmypdf.ocr(
-                            input_path,
-                            ocr_path,
-                            force_ocr=True,
-                            output_type="pdf",
-                            deskew=True,
-                            progress_bar=False,
-                        )
-                        with pdfplumber.open(ocr_path) as pdf:
-                            settings_tbl = {
-                                "vertical_strategy": "text",
-                                "horizontal_strategy": "text",
-                                "snap_tolerance": 5,
-                                "join_tolerance": 5,
-                            }
-                            for page in pdf.pages:
-                                tables = page.extract_tables(settings_tbl)
-                                for table in tables or []:
-                                    all_tables.append(pd.DataFrame(table))
-                    except Exception as exc:
-                        logger.info("OCR table rescue failed: %s", exc)
-
-                if all_tables:
-                    for i in range(len(all_tables)):
-                        all_tables[i].columns = range(all_tables[i].shape[1])
-                    master_df = pd.concat(all_tables, ignore_index=True)
-                    master_df.dropna(how="all", inplace=True)
-                    out_path = make_temp_path(".xlsx", settings)
-                    master_df.to_excel(
-                        out_path, index=False, header=False, sheet_name="Master_Data"
+            async with _limiter(request).slot(label="extraction job"):
+                for upload in files:
+                    name, data = await read_upload(
+                        upload, settings, allowed_extensions=PDF_EXTENSIONS
                     )
-                    excel_files.append((f"{Path(name).stem}.xlsx", out_path))
+                    input_path = write_bytes(data, ".pdf", settings)
+                    temps.append(input_path)
+                    all_tables: list = []
+
+                    if settings.enable_camelot and camelot is not None:
+                        try:
+                            tables = camelot.read_pdf(input_path, pages="all", flavor="stream")
+                            for table in tables:
+                                if not table.df.empty:
+                                    all_tables.append(table.df)
+                        except Exception as exc:
+                            logger.info("Camelot extraction fallback: %s", exc)
+
+                    if not all_tables:
+                        try:
+                            with pdfplumber.open(input_path) as pdf:
+                                for page in pdf.pages:
+                                    tables = page.extract_tables(
+                                        {
+                                            "vertical_strategy": "text",
+                                            "horizontal_strategy": "text",
+                                        }
+                                    )
+                                    for table in tables or []:
+                                        all_tables.append(pd.DataFrame(table))
+                        except Exception as exc:
+                            logger.info("pdfplumber extraction fallback: %s", exc)
+
+                    if not all_tables and settings.enable_ocr and ocrmypdf is not None:
+                        ocr_path = make_temp_path(".pdf", settings)
+                        temps.append(ocr_path)
+                        try:
+                            ocrmypdf.ocr(
+                                input_path,
+                                ocr_path,
+                                force_ocr=True,
+                                output_type="pdf",
+                                deskew=True,
+                                progress_bar=False,
+                            )
+                            with pdfplumber.open(ocr_path) as pdf:
+                                settings_tbl = {
+                                    "vertical_strategy": "text",
+                                    "horizontal_strategy": "text",
+                                    "snap_tolerance": 5,
+                                    "join_tolerance": 5,
+                                }
+                                for page in pdf.pages:
+                                    tables = page.extract_tables(settings_tbl)
+                                    for table in tables or []:
+                                        all_tables.append(pd.DataFrame(table))
+                        except Exception as exc:
+                            logger.info("OCR table rescue failed: %s", exc)
+
+                    if all_tables:
+                        for i in range(len(all_tables)):
+                            all_tables[i].columns = range(all_tables[i].shape[1])
+                        master_df = pd.concat(all_tables, ignore_index=True)
+                        master_df.dropna(how="all", inplace=True)
+                        out_path = make_temp_path(".xlsx", settings)
+                        master_df.to_excel(
+                            out_path, index=False, header=False, sheet_name="Master_Data"
+                        )
+                        excel_files.append((f"{Path(name).stem}.xlsx", out_path))
 
             if not excel_files:
                 raise HTTPException(
@@ -810,7 +814,7 @@ def create_app() -> FastAPI:
         file: UploadFile = File(...),
         text: str = Form(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         watermark_text = (text or "").strip()
         if not watermark_text:
             raise HTTPException(status_code=400, detail="Watermark text is required.")
@@ -861,7 +865,7 @@ def create_app() -> FastAPI:
         background: BackgroundTasks,
         file: UploadFile = File(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
         input_path = write_bytes(data, ".pdf", settings)
         try:
@@ -895,7 +899,7 @@ def create_app() -> FastAPI:
         file: UploadFile = File(...),
         page_start: int = Form(0),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
         input_path = write_bytes(data, ".pdf", settings)
         try:
@@ -903,7 +907,6 @@ def create_app() -> FastAPI:
             try:
                 reader = PdfReader(input_path)
                 if reader.is_encrypted:
-                    # Try empty password (owner-only encryption)
                     try:
                         result = reader.decrypt("")
                         is_locked = result == 0
@@ -977,7 +980,7 @@ def create_app() -> FastAPI:
         file: UploadFile = File(...),
         modifications: str = Form(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
 
         try:
@@ -986,6 +989,8 @@ def create_app() -> FastAPI:
                 raise ValueError("modifications must be an object")
             rotations = mods.get("rotations", {}) or {}
             deletions = set(mods.get("deletions", []) or [])
+            if len(deletions) > 10_000 or len(rotations) > 10_000:
+                raise ValueError("too many modifications")
         except Exception as exc:
             raise HTTPException(status_code=400, detail="Invalid modifications payload.") from exc
 
@@ -1030,7 +1035,7 @@ def create_app() -> FastAPI:
         request: Request,
         files: List[UploadFile] = File(...),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         validate_file_count(len(files), settings)
 
         preview_images = []
@@ -1071,9 +1076,8 @@ def create_app() -> FastAPI:
         file: UploadFile = File(...),
         password: str = Form(...),
     ):
-        settings: Settings = request.app.state.settings
-        if not password:
-            raise HTTPException(status_code=400, detail="Password is required.")
+        settings = _settings(request)
+        password = validate_password(password, settings, required=True, field="password")
 
         name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
         input_path = write_bytes(data, ".pdf", settings)
@@ -1117,7 +1121,7 @@ def create_app() -> FastAPI:
         files: List[UploadFile] = File(...),
         level: str = Form("medium"),
     ):
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         validate_file_count(len(files), settings)
 
         compression_settings = {
@@ -1138,17 +1142,20 @@ def create_app() -> FastAPI:
                     allowed_extensions=OFFICE_COMPRESS_EXTENSIONS,
                     label="Office document",
                 )
+                assert_zip_safe(data, settings, label=name)
                 ext = Path(name).suffix.lower()
                 out_zip = make_temp_path(ext, settings)
 
                 with zipfile.ZipFile(io.BytesIO(data), "r") as zin:
                     with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zout:
                         for item in zin.infolist():
-                            buffer = zin.read(item.filename)
-                            # Never allow path traversal inside package members
-                            member_name = Path(item.filename).as_posix()
-                            if member_name.startswith("/") or ".." in member_name.split("/"):
+                            if not is_safe_zip_member(item.filename):
                                 continue
+                            if item.is_dir():
+                                continue
+
+                            member_name = Path(item.filename).as_posix()
+                            buffer = zin.read(item.filename)
 
                             filename_lower = member_name.lower()
                             if filename_lower.endswith(
@@ -1171,7 +1178,7 @@ def create_app() -> FastAPI:
                                     if hasattr(Image, "Resampling"):
                                         img.thumbnail(max_dim, Image.Resampling.LANCZOS)
                                     else:
-                                        img.thumbnail(max_dim, Image.ANTIALIAS)
+                                        img.thumbnail(max_dim, Image.LANCZOS)
 
                                     img_io = io.BytesIO()
                                     img.save(img_io, format="JPEG", quality=quality, optimize=True)
@@ -1218,10 +1225,13 @@ def create_app() -> FastAPI:
         page_index: int = Form(0),
     ):
         """Return page preview + selectable text spans (Adobe-like edit surface)."""
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
         try:
-            info = inspect_page(data, page_index=int(page_index))
+            page_i = int(page_index)
+            if page_i < 0:
+                raise HTTPException(status_code=400, detail="page_index must be >= 0")
+            info = inspect_page(data, page_index=page_i)
             info["filename"] = name
             return JSONResponse(content=info)
         except ValueError as exc:
@@ -1245,7 +1255,7 @@ def create_app() -> FastAPI:
         Apply real content edits via PyMuPDF:
         replace / redact / add_text / whiteout
         """
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
 
         try:
@@ -1289,13 +1299,15 @@ def create_app() -> FastAPI:
         actions: str = Form(...),
     ):
         """Backward-compatible stamper API → mapped onto real content editor."""
-        settings: Settings = request.app.state.settings
+        settings = _settings(request)
         name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
 
         try:
             edits = json.loads(actions)
             if not isinstance(edits, list):
                 raise ValueError("actions must be a list")
+            if len(edits) > 500:
+                raise ValueError("too many actions")
         except Exception as exc:
             raise HTTPException(status_code=400, detail="Invalid actions payload.") from exc
 
@@ -1324,7 +1336,7 @@ def create_app() -> FastAPI:
                         "page": page_i,
                         "x": float(act.get("pctX", 0)),
                         "y": float(act.get("pctY", 0)),
-                        "text": str(act.get("text", "")),
+                        "text": str(act.get("text", ""))[:2000],
                         "size": float(act.get("size", 12)),
                     }
                 )
@@ -1362,5 +1374,5 @@ if __name__ == "__main__":
         port=settings.port,
         reload=settings.environment == "development",
         proxy_headers=True,
-        forwarded_allow_ips="*",
+        forwarded_allow_ips=settings.forwarded_allow_ips,
     )
