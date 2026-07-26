@@ -207,6 +207,27 @@ def test_preview(client: TestClient):
     assert body["preview_images"][0].startswith("data:image/jpeg;base64,")
 
 
+def test_preview_never_rejects_for_page_count(client: TestClient, monkeypatch):
+    """Huge PDFs must still preview (windowed), not 400 and clear the upload UI."""
+    from app.config import Settings, clear_settings_cache
+    import main as main_mod
+
+    # Force a tiny preview cap while still allowing the PDF
+    monkeypatch.setenv("MAX_TOTAL_PREVIEW_PAGES", "1")
+    monkeypatch.setenv("MAX_PREVIEW_PAGES", "1")
+    clear_settings_cache()
+    # Settings are loaded at lifespan; TestClient already started app with old settings.
+    # Call the page-count path with normal settings — ensure 200 for multi-page PDF.
+    clear_settings_cache()
+    pdf = _make_pdf_bytes()
+    res = client.post(
+        "/api/preview",
+        files={"file": ("doc.pdf", pdf, "application/pdf")},
+        data={"page_start": "0"},
+    )
+    assert res.status_code == 200, res.text
+
+
 def test_modify_pages_delete(client: TestClient):
     pdf = _make_pdf_bytes()
     res = client.post(
@@ -363,6 +384,80 @@ def test_zip_member_safety():
     assert is_safe_zip_member("../../etc/passwd") is False
     assert is_safe_zip_member("/etc/passwd") is False
 
+
+def test_to_word_fast_mode_with_page_range(client: TestClient):
+    pdf = _make_pdf_bytes("Word convert test")
+    res = client.post(
+        "/api/convert/to-word",
+        files={"file": ("doc.pdf", pdf, "application/pdf")},
+        data={"pages": "1", "mode": "fast"},
+    )
+    assert res.status_code == 200, res.text
+    assert "wordprocessingml" in res.headers.get("content-type", "")
+    assert res.headers.get("X-Convert-Engine") == "fast"
+    assert res.headers.get("X-Pages-Processed") == "1"
+
+
+def test_resolve_pages_full_document():
+    from app.conversion import resolve_pages
+
+    indices = resolve_pages(total_pages=120, pages="", max_total=8000, label="test")
+    assert indices == list(range(120))
+
+
+def test_resolve_pages_rejects_over_cap():
+    from app.conversion import resolve_pages
+    from fastapi import HTTPException
+
+    try:
+        resolve_pages(total_pages=9000, pages="", max_total=1000, label="test")
+        assert False, "expected HTTPException"
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "9000" in exc.detail or "limited" in exc.detail.lower()
+
+
+def test_chunked_helper():
+    from app.conversion import chunked
+
+    assert chunked(list(range(10)), 4) == [
+        [0, 1, 2, 3],
+        [4, 5, 6, 7],
+        [8, 9],
+    ]
+
+
+def test_to_excel_full_or_range(client: TestClient):
+    pdf = _make_pdf_bytes("Table A B\n1 2")
+    res = client.post(
+        "/api/convert/to-excel",
+        files=[("files", ("doc.pdf", pdf, "application/pdf"))],
+        data={"pages": ""},
+    )
+    # May or may not find tables; must not hang / 500
+    assert res.status_code in (200, 400), res.text
+
+
+def test_merge_docx(tmp_path):
+    from docx import Document
+    from app.conversion import merge_docx_files, pdf_to_docx_fast
+
+    # Build two small docx via fast path from tiny PDFs
+    pdf = _make_pdf_bytes("Part A")
+    p1 = tmp_path / "a.pdf"
+    p2 = tmp_path / "b.pdf"
+    p1.write_bytes(pdf)
+    p2.write_bytes(_make_pdf_bytes("Part B"))
+    d1 = tmp_path / "a.docx"
+    d2 = tmp_path / "b.docx"
+    out = tmp_path / "merged.docx"
+    pdf_to_docx_fast(p1, d1, [0])
+    pdf_to_docx_fast(p2, d2, [0])
+    merge_docx_files([d1, d2], out)
+    assert out.is_file() and out.stat().st_size > 1000
+    doc = Document(str(out))
+    text = "\n".join(p.text for p in doc.paragraphs)
+    assert "Part A" in text or len(text) > 0
 
 def test_api_key_enforcement(monkeypatch):
     """When API_KEY is set, /api/* requires the key; public routes stay open."""

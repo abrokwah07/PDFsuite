@@ -8,6 +8,7 @@ temporary files are cleaned up.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import json
@@ -38,6 +39,15 @@ from pypdf.constants import UserAccessPermissions
 from reportlab.pdfgen import canvas
 
 from app.config import Settings, get_settings
+from app.conversion import (
+    convert_word_layout_chunked,
+    count_pages,
+    extract_tables_chunked,
+    pages_label,
+    pdf_to_docx_fast,
+    resolve_pages,
+    write_page_subset,
+)
 from app.job_limit import JobLimiter, RateLimiter
 from app.middleware import RequestContextMiddleware
 from app.pdf_editor import apply_edits, inspect_page
@@ -262,7 +272,12 @@ def create_app() -> FastAPI:
                     "max_upload_mb": settings.max_upload_bytes // (1024 * 1024),
                     "max_files_per_request": settings.max_files_per_request,
                     "max_ocr_pages": settings.max_ocr_pages,
+                    "max_word_pages": settings.max_word_total_pages,
+                    "max_excel_pages": settings.max_excel_total_pages,
+                    "word_chunk_pages": settings.word_chunk_pages,
+                    "excel_chunk_pages": settings.excel_chunk_pages,
                     "max_concurrent_jobs": settings.max_concurrent_jobs,
+                    "auto_chunk_merge": True,
                 },
             },
         )
@@ -647,30 +662,114 @@ def create_app() -> FastAPI:
         request: Request,
         background: BackgroundTasks,
         file: UploadFile = File(...),
+        pages: str = Form(""),
+        mode: str = Form("auto"),
     ):
+        """
+        Convert PDF → Word as one file.
+
+        Empty ``pages`` = entire document. Large files are processed in automatic
+        chunks and merged back into a single .docx.
+
+        - mode=auto: layout for small docs, fast text for large ones
+        - mode=layout: preserve layout (chunked + merge; slower)
+        - mode=fast: text extraction (best for long PDFs)
+        """
         settings = _settings(request)
-        if Converter is None:
-            raise HTTPException(status_code=503, detail="pdf2docx is not installed.")
+        mode_norm = (mode or "auto").strip().lower()
+        if mode_norm not in {"auto", "layout", "fast"}:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid mode. Use auto, layout, or fast.",
+            )
 
         name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
         input_path = write_bytes(data, ".pdf", settings)
         output_docx = make_temp_path(".docx", settings)
+        cleanup: list[str | None] = [input_path]
         try:
+            total = await asyncio.to_thread(count_pages, input_path)
+            indices = resolve_pages(
+                total_pages=total,
+                pages=pages,
+                max_total=settings.max_word_total_pages,
+                label="PDF → Word",
+            )
+
+            # Auto: layout only for short jobs; full books use fast + chunkless text
+            use_layout = mode_norm == "layout" or (
+                mode_norm == "auto" and len(indices) <= settings.word_layout_page_threshold
+            )
+            if use_layout and Converter is None:
+                use_layout = False
+
+            chunks_used = 1
+            if use_layout:
+                chunks_used = max(1, (len(indices) + settings.word_chunk_pages - 1) // settings.word_chunk_pages)
+
+            label = pages_label(indices, total, chunks=chunks_used if use_layout else 1)
+            logger.info(
+                "to-word file=%s total=%s pages=%s mode=%s engine=%s chunks~%s",
+                name,
+                total,
+                len(indices),
+                mode_norm,
+                "layout" if use_layout else "fast",
+                chunks_used,
+            )
+
             async with _limiter(request).slot(label="conversion job"):
-                cv = Converter(input_path)
-                try:
-                    cv.convert(output_docx)
-                finally:
-                    cv.close()
+                if use_layout:
+
+                    def _layout_job() -> tuple[int, int]:
+                        local_cleanup: list[str] = []
+                        try:
+                            return convert_word_layout_chunked(
+                                input_path=input_path,
+                                output_path=output_docx,
+                                indices=indices,
+                                chunk_size=settings.word_chunk_pages,
+                                converter_cls=Converter,
+                                make_temp=lambda s: make_temp_path(s, settings),
+                                cleanup=local_cleanup,
+                            )
+                        finally:
+                            for p in local_cleanup:
+                                safe_unlink(p)
+
+                    _pages, chunks_used = await asyncio.to_thread(_layout_job)
+                    label = pages_label(indices, total, chunks=chunks_used)
+                else:
+                    await asyncio.to_thread(pdf_to_docx_fast, input_path, output_docx, indices)
+                    # Fast path is one pass; still report batching intent for huge docs
+                    chunks_used = max(
+                        1,
+                        (len(indices) + max(settings.word_chunk_pages, 1) - 1)
+                        // max(settings.word_chunk_pages, 1),
+                    )
+                    # Don't claim multi-merge for single-pass fast
+                    chunks_used = 1
+                    label = pages_label(indices, total, chunks=1)
 
             base_name = Path(name).stem
-            return file_response(
+            if total > 0 and len(indices) < total:
+                fname = f"{base_name}_p{indices[0] + 1}-{indices[-1] + 1}.docx"
+            else:
+                fname = f"{base_name}.docx"
+
+            resp = file_response(
                 output_docx,
-                filename=f"{base_name}.docx",
+                filename=fname,
                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 background=background,
-                extra_cleanup=[input_path],
+                extra_cleanup=cleanup,
             )
+            resp.headers["X-Pages-Processed"] = str(len(indices))
+            resp.headers["X-Pages-Total"] = str(total)
+            resp.headers["X-Convert-Engine"] = "layout" if use_layout else "fast"
+            resp.headers["X-Chunks"] = str(chunks_used)
+            resp.headers["X-Pages-Label"] = label
+            return resp
         except HTTPException:
             safe_unlink(input_path)
             safe_unlink(output_docx)
@@ -686,7 +785,14 @@ def create_app() -> FastAPI:
         request: Request,
         background: BackgroundTasks,
         files: List[UploadFile] = File(...),
+        pages: str = Form(""),
     ):
+        """
+        Extract tables from PDFs into one Excel file.
+
+        Empty ``pages`` = entire document, scanned in automatic page chunks and
+        merged into a single workbook. Optional ``pages`` limits the scope.
+        """
         settings = _settings(request)
         if pd is None:
             raise HTTPException(status_code=503, detail="pandas is not installed.")
@@ -694,6 +800,7 @@ def create_app() -> FastAPI:
         validate_file_count(len(files), settings)
         excel_files: list[tuple[str, str]] = []
         temps: list[str] = []
+        last_label = ""
 
         try:
             async with _limiter(request).slot(label="extraction job"):
@@ -703,55 +810,78 @@ def create_app() -> FastAPI:
                     )
                     input_path = write_bytes(data, ".pdf", settings)
                     temps.append(input_path)
+
+                    total = await asyncio.to_thread(count_pages, input_path)
+                    indices = resolve_pages(
+                        total_pages=total,
+                        pages=pages,
+                        max_total=settings.max_excel_total_pages,
+                        label="PDF → Excel",
+                    )
+                    n_chunks = max(
+                        1,
+                        (len(indices) + settings.excel_chunk_pages - 1)
+                        // settings.excel_chunk_pages,
+                    )
+                    last_label = pages_label(indices, total, chunks=n_chunks)
+                    logger.info(
+                        "to-excel file=%s total=%s pages=%s chunks=%s",
+                        name,
+                        total,
+                        len(indices),
+                        n_chunks,
+                    )
+
                     all_tables: list = []
+                    try:
+                        all_tables = await asyncio.to_thread(
+                            extract_tables_chunked,
+                            input_path,
+                            indices,
+                            chunk_size=settings.excel_chunk_pages,
+                            pd_module=pd,
+                            camelot_module=camelot,
+                            enable_camelot=settings.enable_camelot and camelot is not None,
+                        )
+                    except Exception as exc:
+                        logger.info("chunked table extraction failed: %s", exc)
+                        all_tables = []
 
-                    if settings.enable_camelot and camelot is not None:
-                        try:
-                            tables = camelot.read_pdf(input_path, pages="all", flavor="stream")
-                            for table in tables:
-                                if not table.df.empty:
-                                    all_tables.append(table.df)
-                        except Exception as exc:
-                            logger.info("Camelot extraction fallback: %s", exc)
-
-                    if not all_tables:
-                        try:
-                            with pdfplumber.open(input_path) as pdf:
-                                for page in pdf.pages:
-                                    tables = page.extract_tables(
-                                        {
-                                            "vertical_strategy": "text",
-                                            "horizontal_strategy": "text",
-                                        }
-                                    )
-                                    for table in tables or []:
-                                        all_tables.append(pd.DataFrame(table))
-                        except Exception as exc:
-                            logger.info("pdfplumber extraction fallback: %s", exc)
-
-                    if not all_tables and settings.enable_ocr and ocrmypdf is not None:
+                    # OCR rescue only for small explicit ranges that found nothing
+                    if (
+                        not all_tables
+                        and settings.enable_ocr
+                        and ocrmypdf is not None
+                        and len(indices) <= 20
+                    ):
+                        subset_path = make_temp_path(".pdf", settings)
+                        temps.append(subset_path)
                         ocr_path = make_temp_path(".pdf", settings)
                         temps.append(ocr_path)
                         try:
-                            ocrmypdf.ocr(
-                                input_path,
-                                ocr_path,
-                                force_ocr=True,
-                                output_type="pdf",
-                                deskew=True,
-                                progress_bar=False,
+                            await asyncio.to_thread(
+                                write_page_subset, input_path, subset_path, indices
                             )
-                            with pdfplumber.open(ocr_path) as pdf:
-                                settings_tbl = {
-                                    "vertical_strategy": "text",
-                                    "horizontal_strategy": "text",
-                                    "snap_tolerance": 5,
-                                    "join_tolerance": 5,
-                                }
-                                for page in pdf.pages:
-                                    tables = page.extract_tables(settings_tbl)
-                                    for table in tables or []:
-                                        all_tables.append(pd.DataFrame(table))
+
+                            def _ocr() -> None:
+                                ocrmypdf.ocr(
+                                    subset_path,
+                                    ocr_path,
+                                    force_ocr=True,
+                                    output_type="pdf",
+                                    deskew=True,
+                                    progress_bar=False,
+                                )
+
+                            await asyncio.to_thread(_ocr)
+                            from app.conversion import extract_tables_pdfplumber
+
+                            all_tables = await asyncio.to_thread(
+                                extract_tables_pdfplumber,
+                                ocr_path,
+                                list(range(len(indices))),
+                                pd_module=pd,
+                            )
                         except Exception as exc:
                             logger.info("OCR table rescue failed: %s", exc)
 
@@ -761,24 +891,40 @@ def create_app() -> FastAPI:
                         master_df = pd.concat(all_tables, ignore_index=True)
                         master_df.dropna(how="all", inplace=True)
                         out_path = make_temp_path(".xlsx", settings)
-                        master_df.to_excel(
-                            out_path, index=False, header=False, sheet_name="Master_Data"
+                        await asyncio.to_thread(
+                            master_df.to_excel,
+                            out_path,
+                            index=False,
+                            header=False,
+                            sheet_name="Master_Data",
                         )
-                        excel_files.append((f"{Path(name).stem}.xlsx", out_path))
+                        stem = Path(name).stem
+                        if total > 0 and len(indices) < total:
+                            out_name = f"{stem}_p{indices[0] + 1}-{indices[-1] + 1}.xlsx"
+                        else:
+                            out_name = f"{stem}.xlsx"
+                        excel_files.append((out_name, out_path))
 
             if not excel_files:
                 raise HTTPException(
-                    status_code=400, detail="No readable tables found in any files."
+                    status_code=400,
+                    detail=(
+                        "No readable tables found. "
+                        "Try a page range that contains tables, or a different PDF."
+                    ),
                 )
 
             if len(excel_files) == 1:
                 schedule_cleanup(background, *temps)
-                return file_response(
+                resp = file_response(
                     excel_files[0][1],
                     filename=excel_files[0][0],
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     background=background,
                 )
+                if last_label:
+                    resp.headers["X-Pages-Label"] = last_label
+                return resp
 
             zip_path = make_temp_path(".zip", settings)
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -931,27 +1077,48 @@ def create_app() -> FastAPI:
 
             page_start = max(0, int(page_start))
             preview_images: list[str] = []
-            with pdfplumber.open(input_path) as pdf:
-                total_pages = len(pdf.pages)
-                if total_pages > settings.max_total_preview_pages:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            f"PDF has {total_pages} pages; max previewable is "
-                            f"{settings.max_total_preview_pages}."
-                        ),
-                    )
+            # Prefer PyMuPDF for page count + raster (much faster on huge PDFs)
+            total_pages = 0
+            start = 0
+            end = 0
+            try:
+                import fitz
 
-                start = min(page_start, total_pages)
-                end = min(start + settings.max_preview_pages, total_pages)
-
-                for i in range(start, end):
-                    page = pdf.pages[i]
-                    img = page.to_image(resolution=110)
-                    buffer = io.BytesIO()
-                    img.original.save(buffer, format="JPEG", quality=80, optimize=True)
-                    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
-                    preview_images.append(f"data:image/jpeg;base64,{encoded}")
+                doc = fitz.open(input_path)
+                try:
+                    total_pages = doc.page_count
+                    # Cap how far into a huge doc the user can page the preview UI
+                    hard_cap = max(settings.max_total_preview_pages, settings.max_preview_pages)
+                    if page_start >= hard_cap:
+                        page_start = max(0, hard_cap - settings.max_preview_pages)
+                    start = min(page_start, total_pages)
+                    end = min(start + settings.max_preview_pages, total_pages, hard_cap)
+                    # Never refuse large PDFs — only preview a window of pages
+                    for i in range(start, end):
+                        page = doc[i]
+                        # Lower DPI for speed on big files
+                        zoom = 1.2 if total_pages > 200 else 1.5
+                        pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+                        encoded = base64.b64encode(pix.tobytes("jpeg")).decode("ascii")
+                        preview_images.append(f"data:image/jpeg;base64,{encoded}")
+                finally:
+                    doc.close()
+            except Exception as fitz_exc:
+                logger.info("PyMuPDF preview fallback to pdfplumber: %s", fitz_exc)
+                with pdfplumber.open(input_path) as pdf:
+                    total_pages = len(pdf.pages)
+                    hard_cap = max(settings.max_total_preview_pages, settings.max_preview_pages)
+                    if page_start >= hard_cap:
+                        page_start = max(0, hard_cap - settings.max_preview_pages)
+                    start = min(page_start, total_pages)
+                    end = min(start + settings.max_preview_pages, total_pages, hard_cap)
+                    for i in range(start, end):
+                        page = pdf.pages[i]
+                        img = page.to_image(resolution=100)
+                        buffer = io.BytesIO()
+                        img.original.save(buffer, format="JPEG", quality=75, optimize=True)
+                        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+                        preview_images.append(f"data:image/jpeg;base64,{encoded}")
 
             safe_unlink(input_path)
             return JSONResponse(
@@ -961,8 +1128,10 @@ def create_app() -> FastAPI:
                     "preview_images": preview_images,
                     "current_start": start,
                     "current_end": end,
-                    "has_more": end < total_pages,
+                    "has_more": end < min(total_pages, max(settings.max_total_preview_pages, settings.max_preview_pages)),
                     "is_encrypted": False,
+                    "preview_capped": total_pages
+                    > max(settings.max_total_preview_pages, settings.max_preview_pages),
                 }
             )
         except HTTPException:

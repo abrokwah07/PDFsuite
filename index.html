@@ -23,6 +23,28 @@
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .toast-enter { animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+        /* Progress overlay */
+        #progress-overlay { backdrop-filter: blur(6px); }
+        #progress-bar-fill {
+            transition: width 0.25s ease-out;
+            background: linear-gradient(90deg, #2563eb, #38bdf8, #2563eb);
+            background-size: 200% 100%;
+        }
+        #progress-bar-fill.is-indeterminate {
+            width: 40% !important;
+            animation: progress-indeterminate 1.2s ease-in-out infinite, progress-shimmer 1.5s linear infinite;
+        }
+        @keyframes progress-indeterminate {
+            0% { margin-left: 0%; }
+            50% { margin-left: 60%; }
+            100% { margin-left: 0%; }
+        }
+        @keyframes progress-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        #progress-overlay.hidden { display: none !important; }
     </style>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232563eb'/%3E%3Cpath d='M9 8h9l5 5v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z' fill='white'/%3E%3Cpath d='M18 8v5h5' fill='none' stroke='%232563eb' stroke-width='1.5'/%3E%3C/svg%3E">
 </head>
@@ -30,6 +52,27 @@
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans h-screen flex overflow-hidden transition-colors duration-300 relative">
 
     <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
+
+    <!-- Global job progress overlay -->
+    <div id="progress-overlay" class="hidden fixed inset-0 z-[90] bg-slate-900/40 dark:bg-black/50 flex items-center justify-center p-4" role="status" aria-live="polite" aria-busy="true">
+        <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <div class="flex items-start justify-between gap-3 mb-4">
+                <div>
+                    <h3 id="progress-title" class="text-lg font-bold text-slate-900 dark:text-white">Working…</h3>
+                    <p id="progress-subtitle" class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Please wait</p>
+                </div>
+                <span id="progress-percent" class="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400 tabular-nums">0%</span>
+            </div>
+            <div class="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden relative">
+                <div id="progress-bar-fill" class="h-full rounded-full w-0"></div>
+            </div>
+            <div class="mt-3 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
+                <span id="progress-phase">Starting…</span>
+                <span id="progress-elapsed">0s</span>
+            </div>
+            <p class="mt-4 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">Large PDFs are processed in batches on your machine. The bar moves during upload, then shows processing until the file is ready.</p>
+        </div>
+    </div>
 
     <div id="drag-overlay" class="fixed inset-0 bg-blue-600/90 dark:bg-blue-900/90 z-[100] hidden flex-col items-center justify-center text-white border-8 border-dashed border-white/50 backdrop-blur-sm transition-all">
         <svg class="w-24 h-24 mb-4 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
@@ -130,18 +173,36 @@
 
             <div id="tool-excel" class="tool-section block h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF to Excel</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Extract tables automatically. Upload multiple for a ZIP batch.</p>
-                <div class="mb-6 flex-grow">
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Extract tables automatically. Large PDFs are scanned in batches and merged into <strong>one Excel file</strong>.</p>
+                <div class="mb-6 flex-grow space-y-3">
                     <input type="file" id="to-excel-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
+                    <div>
+                        <label for="to-excel-pages" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Page range (optional)</label>
+                        <input type="text" id="to-excel-pages" placeholder="Leave empty = whole PDF · or e.g. 1-200" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
+                        <p id="to-excel-hint" class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Empty range converts the full document in auto-batches, then merges results.</p>
+                    </div>
                 </div>
                 <button id="to-excel-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to Excel</button>
             </div>
 
             <div id="tool-word" class="tool-section hidden h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF to Word</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Extract text and layout from a PDF into an editable Word document.</p>
-                <div class="mb-6 flex-grow">
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Convert to editable Word. Huge PDFs are processed in batches and merged into <strong>one .docx</strong>.</p>
+                <div class="mb-6 flex-grow space-y-3">
                     <input type="file" id="to-word-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 dark:file:bg-teal-900/20 file:text-teal-700 dark:file:text-teal-400 hover:file:bg-teal-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
+                    <div>
+                        <label for="to-word-pages" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Page range (optional)</label>
+                        <input type="text" id="to-word-pages" placeholder="Leave empty = whole PDF · or e.g. 1-500" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500">
+                    </div>
+                    <div>
+                        <label for="to-word-mode" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Conversion mode</label>
+                        <select id="to-word-mode" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500">
+                            <option value="auto" selected>Auto (recommended)</option>
+                            <option value="fast">Fast text (best for long PDFs)</option>
+                            <option value="layout">Layout accurate (slower, auto-chunked)</option>
+                        </select>
+                        <p id="to-word-hint" class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Leave page range empty to convert everything. Long jobs may take several minutes — one file downloads when done.</p>
+                    </div>
                 </div>
                 <button id="to-word-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-teal-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to Word</button>
             </div>
@@ -572,13 +633,24 @@
             
             renderMergeStagingList();
 
+            // Enable convert/action button immediately — do not depend on preview success
             const btnId = `${inputElement.id.replace('-input', '')}-btn`;
-            if(document.getElementById(btnId)) document.getElementById(btnId).disabled = false;
+            const actionBtn = document.getElementById(btnId);
+            if (actionBtn) actionBtn.disabled = false;
 
-            if (currentActiveTool === 'merge' && currentUploadedFiles.length > 1) {
-                await fetchMergePreview();
-            } else {
-                await fetchPreviewData();
+            const sizeMb = (currentUploadedFiles[0].size / (1024 * 1024)).toFixed(1);
+            showToast(`Loaded ${currentUploadedFiles[0].name} (${sizeMb} MB)`, "success");
+
+            try {
+                if (currentActiveTool === 'merge' && currentUploadedFiles.length > 1) {
+                    await fetchMergePreview();
+                } else {
+                    await fetchPreviewData();
+                }
+            } catch (err) {
+                // Keep file selection even if preview blows up
+                console.warn('preview error', err);
+                showPreviewWithoutImage(currentUploadedFiles[0].name, "Ready to convert (preview unavailable)");
             }
         }
 
@@ -613,8 +685,14 @@
                     });
 
                     activateGridView(false); 
-                } else { resetPreview(); }
-            } catch (error) { resetPreview(); showToast("Merge preview failed.", "error"); }
+                } else {
+                    showPreviewWithoutImage("Merge Queue", `${currentUploadedFiles.length} file(s) ready`);
+                    showToast("Merge preview unavailable; files are still selected.", "error");
+                }
+            } catch (error) {
+                showPreviewWithoutImage("Merge Queue", `${currentUploadedFiles.length} file(s) ready`);
+                showToast("Merge preview failed; files are still selected.", "error");
+            }
         }
 
         async function loadPreviewPages(offset) {
@@ -672,7 +750,10 @@
                     }
                     
                     document.getElementById('preview-filename').innerText = data.filename;
-                    document.getElementById('preview-pages').innerText = `${data.total_pages} page(s)`;
+                    const pageLabel = data.preview_capped
+                        ? `${data.total_pages} page(s) · preview shows first pages only`
+                        : `${data.total_pages} page(s)`;
+                    document.getElementById('preview-pages').innerText = pageLabel;
                     
                     document.getElementById('pagination-info').innerText = `Pages ${data.current_start + 1} - ${data.current_end} of ${data.total_pages}`;
                     document.getElementById('prev-page-btn').disabled = data.current_start === 0;
@@ -691,8 +772,16 @@
                     } else {
                         activateSingleView();
                     }
-                } else { resetPreview(); }
-            } catch (error) { resetPreview(); showToast("Preview failed to generate.", "error"); }
+                } else {
+                    // Keep the uploaded file — preview failure must not clear selection
+                    const detail = await readErrorDetail(response);
+                    showPreviewWithoutImage(file.name, "Ready to convert");
+                    showToast(detail || "Preview unavailable; file is still selected.", "error");
+                }
+            } catch (error) {
+                showPreviewWithoutImage(file.name, "Ready to convert");
+                showToast("Preview failed, but your file is still selected. You can convert.", "error");
+            }
         }
         function showPreviewWithoutImage(filename, type) {
             document.getElementById('preview-loading').classList.add('hidden');
@@ -795,45 +884,272 @@
             document.getElementById('preview-active').classList.remove('hidden');
             document.getElementById('preview-active').classList.add('flex');
         }
-        function resetPreview() {
+        function resetPreview(options = {}) {
+            const clearFiles = options.clearFiles !== false; // default true
             document.getElementById('preview-loading').classList.add('hidden');
             document.getElementById('preview-active').classList.add('hidden');
             document.getElementById('preview-active').classList.remove('flex');
             document.getElementById('preview-empty').classList.remove('hidden');
-            currentUploadedFiles = []; loadedPreviewImages = [];
-            document.querySelectorAll('input[type="file"]').forEach(i => i.value = '');
+            if (clearFiles) {
+                currentUploadedFiles = [];
+                loadedPreviewImages = [];
+                document.querySelectorAll('input[type="file"]').forEach(i => i.value = '');
+            }
+        }
+
+        function keepFileClearPreviewOnly() {
+            resetPreview({ clearFiles: false });
+        }
+
+        // --- PROGRESS BAR ---
+        const ProgressUI = (() => {
+            let elapsedTimer = null;
+            let tickTimer = null;
+            let startedAt = 0;
+            let displayPct = 0;
+            let mode = 'idle'; // idle | upload | process | done
+
+            const el = {
+                overlay: () => document.getElementById('progress-overlay'),
+                fill: () => document.getElementById('progress-bar-fill'),
+                percent: () => document.getElementById('progress-percent'),
+                title: () => document.getElementById('progress-title'),
+                subtitle: () => document.getElementById('progress-subtitle'),
+                phase: () => document.getElementById('progress-phase'),
+                elapsed: () => document.getElementById('progress-elapsed'),
+            };
+
+            function formatElapsed(ms) {
+                const s = Math.floor(ms / 1000);
+                if (s < 60) return `${s}s`;
+                const m = Math.floor(s / 60);
+                const r = s % 60;
+                return `${m}m ${r}s`;
+            }
+
+            function setBar(pct, indeterminate) {
+                displayPct = Math.max(0, Math.min(100, pct));
+                const fill = el.fill();
+                const pctEl = el.percent();
+                if (indeterminate) {
+                    fill.classList.add('is-indeterminate');
+                    pctEl.textContent = '…';
+                } else {
+                    fill.classList.remove('is-indeterminate');
+                    fill.style.width = `${displayPct}%`;
+                    fill.style.marginLeft = '0';
+                    pctEl.textContent = `${Math.round(displayPct)}%`;
+                }
+            }
+
+            function show({ title, subtitle, phase }) {
+                startedAt = Date.now();
+                mode = 'upload';
+                el.overlay().classList.remove('hidden');
+                el.overlay().classList.add('flex');
+                el.title().textContent = title || 'Working…';
+                el.subtitle().textContent = subtitle || 'Please wait';
+                el.phase().textContent = phase || 'Starting…';
+                setBar(0, false);
+
+                clearInterval(elapsedTimer);
+                elapsedTimer = setInterval(() => {
+                    el.elapsed().textContent = formatElapsed(Date.now() - startedAt);
+                }, 250);
+
+                clearInterval(tickTimer);
+                // While server processes (after upload), ease the bar toward 90%
+                tickTimer = setInterval(() => {
+                    if (mode !== 'process') return;
+                    // Asymptotic crawl so long jobs still look alive
+                    const next = displayPct + Math.max(0.15, (92 - displayPct) * 0.012);
+                    setBar(Math.min(92, next), false);
+                    const phases = [
+                        'Processing on server…',
+                        'Working through pages…',
+                        'Converting in batches…',
+                        'Merging results…',
+                        'Still working — large files take time…',
+                    ];
+                    const idx = Math.min(phases.length - 1, Math.floor((Date.now() - startedAt) / 12000));
+                    if (displayPct > 35) el.phase().textContent = phases[idx];
+                }, 400);
+            }
+
+            function setUploadProgress(loaded, total) {
+                mode = 'upload';
+                if (total > 0) {
+                    // Upload is 0–28% of the overall bar
+                    const uploadPct = (loaded / total) * 28;
+                    setBar(uploadPct, false);
+                    el.phase().textContent = `Uploading… ${Math.round((loaded / total) * 100)}%`;
+                } else {
+                    setBar(8, true);
+                    el.phase().textContent = 'Uploading…';
+                }
+            }
+
+            function setProcessing(phaseText) {
+                mode = 'process';
+                el.fill().classList.remove('is-indeterminate');
+                if (displayPct < 30) setBar(30, false);
+                if (phaseText) el.phase().textContent = phaseText;
+            }
+
+            function finish(success) {
+                mode = 'done';
+                clearInterval(tickTimer);
+                setBar(100, false);
+                el.phase().textContent = success ? 'Done — downloading…' : 'Stopped';
+                setTimeout(hide, success ? 450 : 200);
+            }
+
+            function hide() {
+                mode = 'idle';
+                clearInterval(elapsedTimer);
+                clearInterval(tickTimer);
+                el.overlay().classList.add('hidden');
+                el.overlay().classList.remove('flex');
+                setBar(0, false);
+            }
+
+            return { show, setUploadProgress, setProcessing, finish, hide };
+        })();
+
+        /**
+         * POST FormData with real upload progress via XHR.
+         * Returns { ok, status, headers, blob, jsonText }.
+         */
+        function xhrPost(url, formData, { timeoutMs = 60 * 60 * 1000, onUploadProgress } = {}) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url, true);
+                xhr.responseType = 'blob';
+                xhr.timeout = timeoutMs;
+
+                xhr.upload.onprogress = (e) => {
+                    if (onUploadProgress) onUploadProgress(e.loaded, e.lengthComputable ? e.total : 0);
+                };
+                xhr.upload.onload = () => {
+                    if (onUploadProgress) onUploadProgress(1, 1);
+                };
+
+                xhr.onload = () => {
+                    const headers = {
+                        get(name) {
+                            return xhr.getResponseHeader(name);
+                        },
+                    };
+                    resolve({
+                        ok: xhr.status >= 200 && xhr.status < 300,
+                        status: xhr.status,
+                        headers,
+                        blob: xhr.response,
+                    });
+                };
+                xhr.onerror = () => reject(new Error('network'));
+                xhr.ontimeout = () => {
+                    const err = new Error('timeout');
+                    err.name = 'AbortError';
+                    reject(err);
+                };
+                xhr.onabort = () => {
+                    const err = new Error('aborted');
+                    err.name = 'AbortError';
+                    reject(err);
+                };
+
+                xhr.send(formData);
+            });
+        }
+
+        async function readErrorDetailFromBlob(blob, status) {
+            try {
+                const text = await blob.text();
+                const data = JSON.parse(text);
+                if (data && data.detail) {
+                    const detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+                    if (data.request_id) return `${detail} (ref ${String(data.request_id).slice(0, 8)})`;
+                    return detail;
+                }
+                return text || `Server error (${status})`;
+            } catch (_) {
+                return `Server error (${status})`;
+            }
         }
 
         // --- GENERIC PROCESSING ENGINE ---
         async function processFile(url, formData, btnElement, defaultText, processingText, fileNamePrefix, fileName) {
+            if (!currentUploadedFiles.length && !formData.has('file') && !formData.has('files')) {
+                showToast("Please choose a file first.", "error");
+                return;
+            }
             const originalContainer = btnElement.parentElement;
             btnElement.textContent = processingText; btnElement.disabled = true;
             originalContainer.classList.add('processing');
 
+            const fileLabel = fileName || (currentUploadedFiles[0] && currentUploadedFiles[0].name) || 'document';
+            ProgressUI.show({
+                title: defaultText,
+                subtitle: fileLabel,
+                phase: 'Preparing upload…',
+            });
+
             try {
-                const response = await fetch(url, { method: 'POST', body: formData });
+                const response = await xhrPost(url, formData, {
+                    timeoutMs: 60 * 60 * 1000,
+                    onUploadProgress: (loaded, total) => {
+                        ProgressUI.setUploadProgress(loaded, total);
+                        if (total > 0 && loaded >= total) {
+                            ProgressUI.setProcessing(processingText || 'Processing on server…');
+                        }
+                    },
+                });
+
+                // Upload finished — ensure we are in processing phase until response handled
+                ProgressUI.setProcessing(processingText || 'Processing on server…');
+
                 if (response.ok) {
-                    const blob = await response.blob();
+                    ProgressUI.setProcessing('Preparing download…');
+                    const blob = response.blob;
                     const downloadUrl = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.style.display = 'none'; a.href = downloadUrl;
                     
                     const contentType = (response.headers.get('Content-Type') || '').split(';')[0].trim();
+                    const disposition = response.headers.get('Content-Disposition') || '';
+                    const serverName = (disposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i) || [])[1];
                     if (contentType === 'application/zip') a.download = `${fileNamePrefix}_batch.zip`;
+                    else if (serverName) a.download = decodeURIComponent(serverName.replace(/"/g, ''));
                     else a.download = `${fileNamePrefix}_${fileName}`;
                     
                     document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(downloadUrl);
                     a.remove();
-                    showToast(`${defaultText} completed.`, "success");
+                    const pagesLabel = response.headers.get('X-Pages-Label');
+                    const engine = response.headers.get('X-Convert-Engine');
+                    let msg = `${defaultText} completed.`;
+                    if (pagesLabel) msg = `${defaultText} done (${pagesLabel}${engine ? ', ' + engine : ''}).`;
+                    ProgressUI.finish(true);
+                    showToast(msg, "success");
+                    resetPreview(); // clear after successful convert
                 } else {
-                    const detail = await readErrorDetail(response);
+                    const detail = await readErrorDetailFromBlob(response.blob, response.status);
+                    ProgressUI.finish(false);
                     showToast(detail, "error");
+                    // Keep file selected so user can retry
+                    btnElement.disabled = false;
                 }
-            } catch (error) { showToast("Connection error. Is the server running?", "error"); } 
-            finally {
+            } catch (error) {
+                ProgressUI.finish(false);
+                if (error && error.name === 'AbortError') {
+                    showToast("Conversion timed out. Try a smaller page range or Fast mode.", "error");
+                } else {
+                    showToast("Connection error. Is the server running?", "error");
+                }
+                btnElement.disabled = false;
+            } finally {
                 btnElement.textContent = defaultText;
                 originalContainer.classList.remove('processing');
-                resetPreview();
             }
         }
 
@@ -841,7 +1157,8 @@
         document.getElementById('to-excel-btn').addEventListener('click', () => {
             const formData = new FormData();
             currentUploadedFiles.forEach(f => formData.append('files', f));
-            processFile('/api/convert/to-excel', formData, document.getElementById('to-excel-btn'), 'Convert to Excel', 'Extracting Tables...', 'tables', currentUploadedFiles[0].name.replace('.pdf','.xlsx'));
+            formData.append('pages', (document.getElementById('to-excel-pages').value || '').trim());
+            processFile('/api/convert/to-excel', formData, document.getElementById('to-excel-btn'), 'Convert to Excel', 'Batch extracting & merging...', 'tables', currentUploadedFiles[0].name.replace('.pdf','.xlsx'));
         });
 
         document.getElementById('manipulate-btn').addEventListener('click', () => {
@@ -866,8 +1183,15 @@
         });
         
         document.getElementById('to-word-btn').addEventListener('click', () => {
-            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]);
-            processFile('/api/convert/to-word', formData, document.getElementById('to-word-btn'), 'Convert to Word', 'Extracting...', 'word', currentUploadedFiles[0].name.replace('.pdf','.docx'));
+            const formData = new FormData();
+            formData.append('file', currentUploadedFiles[0]);
+            formData.append('pages', (document.getElementById('to-word-pages').value || '').trim());
+            formData.append('mode', document.getElementById('to-word-mode').value || 'auto');
+            const mode = document.getElementById('to-word-mode').value;
+            const busy = mode === 'layout'
+                ? 'Chunking, converting & merging (layout)...'
+                : 'Converting full document (auto batches)...';
+            processFile('/api/convert/to-word', formData, document.getElementById('to-word-btn'), 'Convert to Word', busy, 'word', currentUploadedFiles[0].name.replace('.pdf','.docx'));
         });
         
         document.getElementById('to-pdf-btn').addEventListener('click', () => {

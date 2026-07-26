@@ -51,7 +51,7 @@ class Settings:
     """Enterprise-oriented defaults for Local PDF Suite."""
 
     app_name: str = "Local PDF Suite"
-    app_version: str = "1.2.0"
+    app_version: str = "1.2.2"
     environment: str = "production"
 
     # Network
@@ -65,6 +65,16 @@ class Settings:
     max_preview_pages: int = 30
     max_total_preview_pages: int = 500
     max_ocr_pages: int = 200
+    # Full-document auto conversion: process in chunks, merge to one file
+    word_chunk_pages: int = 40  # layout chunks
+    excel_chunk_pages: int = 50
+    max_word_total_pages: int = 8000  # hard safety ceiling for one job
+    max_excel_total_pages: int = 3000
+    # Back-compat aliases used by older code paths / tests
+    max_word_pages: int = 8000
+    max_excel_pages: int = 3000
+    # Layout (pdf2docx) is slow; auto uses fast text above this many pages
+    word_layout_page_threshold: int = 40
     max_password_length: int = 128
     max_zip_entries: int = 10_000
     max_zip_uncompressed_bytes: int = 500 * 1024 * 1024  # 500 MB
@@ -111,7 +121,7 @@ def get_settings() -> Settings:
 
     return Settings(
         app_name=os.getenv("APP_NAME", "Local PDF Suite"),
-        app_version=os.getenv("APP_VERSION", "1.2.0"),
+        app_version=os.getenv("APP_VERSION", "1.2.2"),
         environment=os.getenv("APP_ENV", "production"),
         host=os.getenv("HOST", default_host),
         port=_env_int("PORT", 8000),
@@ -121,6 +131,20 @@ def get_settings() -> Settings:
         max_preview_pages=_env_int("MAX_PREVIEW_PAGES", 30),
         max_total_preview_pages=_env_int("MAX_TOTAL_PREVIEW_PAGES", 500),
         max_ocr_pages=_env_int("MAX_OCR_PAGES", 200),
+        word_chunk_pages=_env_int("WORD_CHUNK_PAGES", 40),
+        excel_chunk_pages=_env_int("EXCEL_CHUNK_PAGES", 50),
+        max_word_total_pages=_env_int("MAX_WORD_TOTAL_PAGES", 8000),
+        max_excel_total_pages=_env_int("MAX_EXCEL_TOTAL_PAGES", 3000),
+        # Prefer new total caps; fall back to legacy MAX_WORD_PAGES if only that is set
+        max_word_pages=_env_int(
+            "MAX_WORD_TOTAL_PAGES",
+            _env_int("MAX_WORD_PAGES", 8000),
+        ),
+        max_excel_pages=_env_int(
+            "MAX_EXCEL_TOTAL_PAGES",
+            _env_int("MAX_EXCEL_PAGES", 3000),
+        ),
+        word_layout_page_threshold=_env_int("WORD_LAYOUT_PAGE_THRESHOLD", 40),
         max_password_length=_env_int("MAX_PASSWORD_LENGTH", 128),
         max_zip_entries=_env_int("MAX_ZIP_ENTRIES", 10_000),
         max_zip_uncompressed_bytes=_env_int(

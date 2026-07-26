@@ -1,14 +1,18 @@
 services:
   pdf-app:
     build: .
-    image: local-pdf-suite:1.2.0
+    image: local-pdf-suite:1.2.2
     container_name: local-pdf-suite
     ports:
       - "${HOST_PORT:-8000}:8000"
     environment:
       APP_ENV: production
       APP_NAME: Local PDF Suite
-      APP_VERSION: "1.2.0"
+      APP_VERSION: "1.2.2"
+      WORD_CHUNK_PAGES: "40"
+      EXCEL_CHUNK_PAGES: "50"
+      MAX_WORD_TOTAL_PAGES: "8000"
+      MAX_EXCEL_TOTAL_PAGES: "3000"
       LOG_LEVEL: INFO
       RUNNING_IN_DOCKER: "1"
       HOST: "0.0.0.0"
