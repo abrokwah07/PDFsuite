@@ -1,28 +1,55 @@
-# 1. Use the lightweight Python base image
-FROM python:3.11-slim
+# Local PDF Suite — production image
+FROM python:3.12-slim-bookworm AS base
 
-# 2. Set the working directory
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    APP_ENV=production \
+    PORT=8000
+
 WORKDIR /app
 
-# 3. Install system dependencies and immediately clean up the apt cache to reduce image size
-RUN apt-get update && apt-get install -y \
+# System dependencies for Ghostscript, OCR, LibreOffice, Camelot/OpenCV
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     ghostscript \
     tesseract-ocr \
+    tesseract-ocr-eng \
     qpdf \
-    libreoffice \
+    libreoffice-writer \
+    libreoffice-calc \
+    libreoffice-impress \
+    libreoffice-java-common \
+    default-jre-headless \
     libgl1 \
     libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 4. Copy requirements and install Python packages securely
+# Install Python deps first for better layer caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Copy the rest of the application code
-COPY . .
+# Application code
+COPY app ./app
+COPY main.py index.html ./
 
-# 6. Expose the port
+# Non-root runtime user
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
+    && mkdir -p /tmp/pdfsuite \
+    && chown -R appuser:appuser /app /tmp/pdfsuite
+
+ENV TEMP_DIR=/tmp/pdfsuite
+
+USER appuser
+
 EXPOSE 8000
 
-# 7. Start the server (Notice: NO --reload flag for production to save memory)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD curl -fsS "http://127.0.0.1:${PORT}/health" || exit 1
+
+# Single worker is safer for memory-heavy PDF jobs; scale with replicas if needed
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]

@@ -1,6 +1,41 @@
 services:
   pdf-app:
     build: .
+    image: local-pdf-suite:1.1.0
+    container_name: local-pdf-suite
     ports:
-      - "8000:8000"
-    restart: always
+      - "${HOST_PORT:-8000}:8000"
+    environment:
+      APP_ENV: production
+      APP_NAME: Local PDF Suite
+      APP_VERSION: "1.1.0"
+      LOG_LEVEL: INFO
+      MAX_UPLOAD_BYTES: "104857600"
+      MAX_FILES_PER_REQUEST: "50"
+      SUBPROCESS_TIMEOUT_SECONDS: "180"
+      TEMP_DIR: /tmp/pdfsuite
+      # Restrict CORS in enterprise deployments, e.g. https://pdf.internal.company
+      ALLOW_ORIGINS: "*"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp/pdfsuite:size=2g,mode=1777
+      - /tmp:size=512m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s

@@ -1,7 +1,42 @@
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Tooling / IDE
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime / artifacts
 *.pdf
 *.zip
 *.docx
 *.xlsx
 *.pptx
-.DS_Store
+*.doc
+*.xls
+*.ppt
+tmp/
+temp/
+/tmp/pdfsuite/
+
+# Docker
+*.log

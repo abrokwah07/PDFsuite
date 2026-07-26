@@ -56,6 +56,10 @@
             <button onclick="switchTool('office')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-office">
                 <div class="text-indigo-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div><span>Office to PDF</span>
             </button>
+            <button onclick="switchTool('compress-office')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-compress-office">
+                <div class="text-rose-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg></div>
+                <span>Compress Office</span>
+            </button>
             <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3 pt-4">Organization</div>
             <button onclick="switchTool('manipulate')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-manipulate">
                 <div class="text-pink-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></div><span>Organize & Rotate</span>
@@ -70,6 +74,11 @@
                 <div class="text-green-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></div><span>Compress PDF</span>
             </button>
             <div class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Security & Edits</div>
+<button onclick="switchTool('stamp')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-stamp">
+                <div class="text-sky-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></div>
+                <span>Edit PDF</span>
+            </button>
+
             <button onclick="switchTool('unlock')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-unlock">
                 <div class="text-emerald-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg></div>
                 <span>Unlock PDF</span>
@@ -134,6 +143,14 @@
                 <div class="mb-6 flex-grow">
                     <input type="file" id="merge-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                 </div>
+                <div id="merge-staging-area" class="hidden flex-col flex-grow mb-6">
+                <div class="flex items-center justify-between mb-2 px-1">
+                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Merge Sequence (Drag or use arrows to reorder)</span>
+                    <span id="merge-file-count" class="text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 px-2 py-0.5 rounded-full">0 files</span>
+                </div>
+                
+                <div id="merge-file-list" class="space-y-2 overflow-y-auto max-h-[350px] p-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800"></div>
+            </div>
                 <button id="merge-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Merge Files</button>
             </div>
 
@@ -146,6 +163,48 @@
                     <input type="text" id="pages-input" placeholder="e.g., 1, 3, 5-7" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
                 </div>
                 <button id="split-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-purple-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Extract Pages</button>
+            </div>
+
+            <div id="tool-stamp" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Edit PDF</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Click existing text to edit it, draw to redact, or place new text. Edits permanently change PDF content (not just a sticker overlay).</p>
+                
+                <div class="mb-4 flex-grow flex flex-col min-h-0">
+                    <input type="file" id="stamp-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-sky-50 dark:file:bg-sky-900/20 file:text-sky-700 dark:file:text-sky-400 hover:file:bg-sky-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-3" onchange="triggerFileSelect(this)">
+                    
+                    <div class="grid grid-cols-3 gap-1.5 mb-3">
+                        <button type="button" id="mode-select-btn" onclick="setStampMode('select')" class="py-2 px-1 rounded-lg border-2 border-sky-500 bg-sky-50 dark:bg-sky-950/50 font-bold text-sky-700 dark:text-sky-400 text-[11px] transition-all shadow-sm">Select / Edit</button>
+                        <button type="button" id="mode-text-btn" onclick="setStampMode('text')" class="py-2 px-1 rounded-lg border-2 border-slate-200 dark:border-slate-700 font-medium text-slate-600 dark:text-slate-400 text-[11px] transition-all">Add Text</button>
+                        <button type="button" id="mode-whiteout-btn" onclick="setStampMode('redact')" class="py-2 px-1 rounded-lg border-2 border-slate-200 dark:border-slate-700 font-medium text-slate-600 dark:text-slate-400 text-[11px] transition-all">Redact</button>
+                    </div>
+
+                    <div id="edit-page-nav" class="hidden items-center justify-between gap-2 mb-3 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <button type="button" id="edit-prev-page" class="px-2 py-1 text-xs font-bold rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 disabled:opacity-40" onclick="changeEditPage(-1)">← Prev</button>
+                        <span id="edit-page-label" class="text-xs font-semibold text-slate-600 dark:text-slate-300">Page 1 / 1</span>
+                        <button type="button" id="edit-next-page" class="px-2 py-1 text-xs font-bold rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 disabled:opacity-40" onclick="changeEditPage(1)">Next →</button>
+                    </div>
+
+                    <div id="text-tools" class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700 mb-3 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-600 dark:text-slate-300">Font size</span>
+                            <div class="flex items-center gap-2">
+                                <input type="range" id="stamp-font-size" min="8" max="36" value="12" class="w-24 accent-sky-500" oninput="this.nextElementSibling.innerText = this.value + 'pt'">
+                                <span class="text-xs font-mono font-bold w-8 text-right dark:text-white">12pt</span>
+                            </div>
+                        </div>
+                        <p id="edit-mode-hint" class="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">Select mode: click a highlighted text line on the page to change it.</p>
+                    </div>
+
+                    <div class="flex-grow overflow-y-auto border border-slate-100 dark:border-slate-800 rounded-lg p-2 bg-slate-50/50 dark:bg-slate-950/20 min-h-[120px]">
+                        <div class="flex items-center justify-between mb-2 px-1">
+                            <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Pending edits</span>
+                            <button type="button" onclick="clearPendingEdits()" class="text-[10px] font-semibold text-red-500 hover:text-red-600">Clear all</button>
+                        </div>
+                        <div id="stamp-tracker-list" class="space-y-1 text-xs text-slate-500 italic">No edits yet. Upload a PDF and click text to start.</div>
+                    </div>
+                </div>
+
+                <button id="stamp-apply-btn" onclick="applyEditsToPDF()" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-sky-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed" disabled>Apply edits &amp; download</button>
             </div>
 
             <div id="tool-compress" class="tool-section hidden h-full flex flex-col">
@@ -222,7 +281,24 @@
                 <button id="ocr-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-yellow-500 hover:text-slate-900 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Run OCR Scan</button>
             </div>
 
+            <div id="tool-compress-office" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Compress Office</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Reduce the file size of Word and PowerPoint documents by optimizing embedded images.</p>
+                <div class="mb-6 flex-grow">
+                    <input type="file" id="compress-office-input" multiple accept=".docx,.pptx" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-rose-50 dark:file:bg-rose-900/20 file:text-rose-700 dark:file:text-rose-400 hover:file:bg-rose-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
+                    
+                    <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Compression Level</label>
+                    <select id="compress-office-level" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-rose-500">
+                        <option value="low">Low (Preserve High Quality Images)</option>
+                        <option value="medium" selected>Medium (Recommended for Emailing)</option>
+                        <option value="high">High (Maximum Space Saving)</option>
+                    </select>
+                </div>
+                <button id="compress-office-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-rose-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Compress Office Files</button>
+            </div>
+
         </div>
+
     </section>
 
     <section class="flex-grow min-w-0 bg-slate-100/50 dark:bg-slate-950/50 flex flex-col items-center justify-center relative overflow-hidden transition-colors duration-300">
@@ -246,8 +322,12 @@
                 <span id="preview-pages" class="text-sm text-slate-500">0 pages</span>
             </div>
             
-            <div id="preview-single" class="flex-grow w-full flex justify-center items-start overflow-y-auto pb-8">
-                <img id="preview-image" src="" class="max-w-full lg:max-w-3xl bg-white shadow-2xl border border-slate-200 dark:border-slate-700 rounded-sm">
+            <div id="preview-single" class="flex-grow w-full flex justify-center items-start overflow-y-auto pb-8 relative select-none">
+                <div id="canvas-wrapper" class="relative inline-block shadow-2xl border border-slate-200 dark:border-slate-700 bg-white">
+                    <img id="preview-image" src="" class="max-w-full lg:max-w-3xl block pointer-events-auto">
+                    
+                    <div id="stamp-glass-layer" class="absolute inset-0 overflow-hidden z-30" style="pointer-events: none;"></div>
+                </div>
             </div>
 
             <div id="preview-grid" class="hidden flex-grow w-full overflow-y-auto pb-8 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 content-start px-8"></div>
@@ -269,6 +349,25 @@
         let pagesToExtract = new Set(); // Tracks clicked pages for Extract tool
 
         // --- TOAST NOTIFICATION SYSTEM ---
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        async function readErrorDetail(response) {
+            try {
+                const data = await response.json();
+                if (data && data.detail) {
+                    return typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+                }
+            } catch (_) { /* ignore non-JSON errors */ }
+            return `Server error (${response.status})`;
+        }
+
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -279,7 +378,8 @@
                 : `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
 
             toast.className = `toast-enter flex items-center p-4 rounded-xl shadow-xl border border-white/10 backdrop-blur-md ${colorClass} text-white font-medium text-sm w-72`;
-            toast.innerHTML = `<div class="mr-3">${icon}</div><div>${message}</div>`;
+            toast.innerHTML = `<div class="mr-3">${icon}</div><div></div>`;
+            toast.lastElementChild.textContent = message;
             
             container.appendChild(toast);
             setTimeout(() => {
@@ -359,6 +459,8 @@
             currentUploadedFiles = Array.from(inputElement.files);
             currentPageStart = 0; pageMods = { rotations: {}, deletions: [] }; pagesToExtract.clear();
             
+            renderMergeStagingList();
+
             const btnId = `${inputElement.id.replace('-input', '')}-btn`;
             if(document.getElementById(btnId)) document.getElementById(btnId).disabled = false;
 
@@ -388,9 +490,14 @@
                     data.previews.forEach((item, index) => {
                         const card = document.createElement('div');
                         card.className = `flex flex-col items-center`;
-                        card.innerHTML = `
-                            <img src="${item.image}" class="w-full shadow-md border border-slate-200 rounded bg-white">
-                            <div class="mt-2 text-xs font-bold text-slate-500 truncate w-full text-center">${index + 1}. ${item.filename}</div>`;
+                        const img = document.createElement('img');
+                        img.src = item.image;
+                        img.className = 'w-full shadow-md border border-slate-200 rounded bg-white';
+                        const label = document.createElement('div');
+                        label.className = 'mt-2 text-xs font-bold text-slate-500 truncate w-full text-center';
+                        label.textContent = `${index + 1}. ${item.filename}`;
+                        card.appendChild(img);
+                        card.appendChild(label);
                         grid.appendChild(card);
                     });
 
@@ -409,16 +516,49 @@
         async function fetchPreviewData() {
             showLoadingState();
             const file = currentUploadedFiles[0];
+
+            // --- THE BYPASS: Skip backend completely for the Unlock tool ---
+            if (currentActiveTool === 'unlock') {
+                document.getElementById('preview-loading').classList.add('hidden');
+                document.getElementById('preview-filename').innerText = file.name;
+                document.getElementById('preview-pages').innerText = "🔒 Locked File";
+                
+                // Show a giant lock SVG instead of trying to render the document
+                const lockSvg = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3E%3C/path%3E%3C/svg%3E";
+                document.getElementById('preview-image').src = lockSvg;
+                
+                // Remove the white background and shadow so the icon looks clean
+                document.getElementById('preview-image').classList.remove('bg-white', 'shadow-2xl', 'border', 'dark:border-slate-700'); 
+                
+                document.getElementById('preview-grid').classList.add('hidden');
+                document.getElementById('preview-grid').classList.remove('grid');
+                document.getElementById('pagination-controls').classList.add('hidden');
+                document.getElementById('preview-single').classList.remove('hidden');
+                
+                document.getElementById('preview-active').classList.remove('hidden');
+                document.getElementById('preview-active').classList.add('flex');
+                return; // Stop executing here! Do not send the file to the server.
+            }
+            // ---------------------------------------------------------------
+
             const formData = new FormData();
             formData.append("file", file);
             formData.append("page_start", currentPageStart);
 
             try {
-                if (!file.name.toLowerCase().endsWith('.pdf')) { resetPreview(); return; }
+                if (!file.name.toLowerCase().endsWith('.pdf')) { 
+                    showPreviewWithoutImage(file.name, "Office Document"); 
+                    return; 
+                }
 
                 const response = await fetch("/api/preview", { method: "POST", body: formData });
                 if (response.ok) {
                     const data = await response.json();
+                    
+                    if (data.is_encrypted) {
+                        showPreviewWithoutImage(data.filename, "🔒 Password Protected PDF");
+                        return;
+                    }
                     
                     document.getElementById('preview-filename').innerText = data.filename;
                     document.getElementById('preview-pages').innerText = `${data.total_pages} page(s)`;
@@ -428,7 +568,11 @@
                     document.getElementById('next-page-btn').disabled = !data.has_more;
 
                     loadedPreviewImages = data.preview_images || [];
-                    if (loadedPreviewImages.length > 0) document.getElementById('preview-image').src = loadedPreviewImages[0];
+                    if (loadedPreviewImages.length > 0) {
+                        document.getElementById('preview-image').src = loadedPreviewImages[0];
+                        // Put the white background and shadow back for actual documents
+                        document.getElementById('preview-image').classList.add('bg-white', 'shadow-2xl', 'border', 'dark:border-slate-700');
+                    }
 
                     if (currentActiveTool === 'manipulate' || currentActiveTool === 'split') {
                         renderPreviewGrid();
@@ -438,6 +582,28 @@
                     }
                 } else { resetPreview(); }
             } catch (error) { resetPreview(); showToast("Preview failed to generate.", "error"); }
+        }
+        function showPreviewWithoutImage(filename, type) {
+            document.getElementById('preview-loading').classList.add('hidden');
+            document.getElementById('preview-filename').innerText = filename;
+            document.getElementById('preview-pages').innerText = type;
+            
+            // Inject a clean, modern Document SVG icon
+            const docSvg = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'%3E%3C/path%3E%3Cpolyline points='14 2 14 8 20 8'%3E%3C/polyline%3E%3Cline x1='16' y1='13' x2='8' y2='13'%3E%3C/line%3E%3Cline x1='16' y1='17' x2='8' y2='17'%3E%3C/line%3E%3Cpolyline points='10 9 9 9 8 9'%3E%3C/polyline%3E%3C/svg%3E";
+            
+            const imgEl = document.getElementById('preview-image');
+            imgEl.src = docSvg;
+            
+            // Remove the white background and shadow so the icon blends cleanly
+            imgEl.classList.remove('bg-white', 'shadow-2xl', 'border', 'dark:border-slate-700'); 
+            
+            document.getElementById('preview-grid').classList.add('hidden');
+            document.getElementById('preview-grid').classList.remove('grid');
+            document.getElementById('pagination-controls').classList.add('hidden');
+            document.getElementById('preview-single').classList.remove('hidden');
+            
+            document.getElementById('preview-active').classList.remove('hidden');
+            document.getElementById('preview-active').classList.add('flex');
         }
 
         function renderPreviewGrid() {
@@ -541,13 +707,18 @@
                     const a = document.createElement('a');
                     a.style.display = 'none'; a.href = downloadUrl;
                     
-                    if (response.headers.get('Content-Type') === 'application/zip') a.download = `${fileNamePrefix}_batch.zip`;
+                    const contentType = (response.headers.get('Content-Type') || '').split(';')[0].trim();
+                    if (contentType === 'application/zip') a.download = `${fileNamePrefix}_batch.zip`;
                     else a.download = `${fileNamePrefix}_${fileName}`;
                     
                     document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(downloadUrl);
-                    showToast(`${defaultText} Completed!`, "success");
-                } else { showToast(`Error processing file on server.`, "error"); }
-            } catch (error) { showToast("Connection error.", "error"); } 
+                    a.remove();
+                    showToast(`${defaultText} completed.`, "success");
+                } else {
+                    const detail = await readErrorDetail(response);
+                    showToast(detail, "error");
+                }
+            } catch (error) { showToast("Connection error. Is the server running?", "error"); } 
             finally {
                 btnElement.textContent = defaultText;
                 originalContainer.classList.remove('processing');
@@ -634,6 +805,25 @@
         function checkUnlock() { unlockBtn.disabled = !(unlockInput.files.length > 0 && unlockPassword.value.trim() !== ''); }
         unlockInput.addEventListener('change', checkUnlock);
         unlockPassword.addEventListener('input', checkUnlock);
+
+        // 11. COMPRESS OFFICE
+        const compressOfficeInput = document.getElementById('compress-office-input');
+        const compressOfficeBtn = document.getElementById('compress-office-btn');
+        compressOfficeInput.addEventListener('change', (e) => { compressOfficeBtn.disabled = e.target.files.length === 0; });
+        compressOfficeBtn.addEventListener('click', async () => {
+            const formData = new FormData();
+            Array.from(compressOfficeInput.files).forEach(file => formData.append('files', file));
+            formData.append('level', document.getElementById('compress-office-level').value); 
+            
+            const firstFileName = compressOfficeInput.files[0].name;
+            const btnText = compressOfficeInput.files.length > 1 ? `Compressing ${compressOfficeInput.files.length} files...` : 'Compressing...';
+            
+            await processFile('/api/compress-office', formData, compressOfficeBtn, 'Compress Office Files', btnText, 'compressed', firstFileName);
+            compressOfficeInput.value = ''; compressOfficeBtn.disabled = true; resetPreview();
+        });
+
+
+
         // Setup initial button states
         ['protect', 'watermark'].forEach(tool => {
             const inputs = document.getElementById(`tool-${tool}`).querySelectorAll('input');
@@ -653,6 +843,583 @@
                 }
             }));
         });
+
+        function showPreviewWithoutImage(filename, type) {
+            document.getElementById('preview-loading').classList.add('hidden');
+            document.getElementById('preview-filename').innerText = filename;
+            document.getElementById('preview-pages').innerText = type;
+            
+            // Inject a clean, modern Document SVG icon
+            const docSvg = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'%3E%3C/path%3E%3Cpolyline points='14 2 14 8 20 8'%3E%3C/polyline%3E%3Cline x1='16' y1='13' x2='8' y2='13'%3E%3C/line%3E%3Cline x1='16' y1='17' x2='8' y2='17'%3E%3C/line%3E%3Cpolyline points='10 9 9 9 8 9'%3E%3C/polyline%3E%3C/svg%3E";
+            
+            const imgEl = document.getElementById('preview-image');
+            imgEl.src = docSvg;
+            
+            // Remove the white background and shadow so the icon blends cleanly
+            imgEl.classList.remove('bg-white', 'shadow-2xl', 'border', 'dark:border-slate-700'); 
+            
+            document.getElementById('preview-grid').classList.add('hidden');
+            document.getElementById('preview-grid').classList.remove('grid');
+            document.getElementById('pagination-controls').classList.add('hidden');
+            document.getElementById('preview-single').classList.remove('hidden');
+            
+            document.getElementById('preview-active').classList.remove('hidden');
+            document.getElementById('preview-active').classList.add('flex');
+        }
+
+        // --- PDF CONTENT EDITOR (PyMuPDF-backed) ---
+        let currentStampMode = 'select';
+        let editPageIndex = 0;
+        let editTotalPages = 1;
+        let editSpans = [];
+        let pendingEdits = []; // {id, type, page, ...}
+        let redactDrag = null;
+
+        const modeBtnBase = 'py-2 px-1 rounded-lg border-2 text-[11px] transition-all';
+        const modeBtnOn = modeBtnBase + ' border-sky-500 bg-sky-50 dark:bg-sky-950/50 font-bold text-sky-700 dark:text-sky-400 shadow-sm';
+        const modeBtnOff = modeBtnBase + ' border-slate-200 dark:border-slate-700 font-medium text-slate-600 dark:text-slate-400';
+
+        function setStampMode(mode) {
+            currentStampMode = mode;
+            const map = {
+                select: document.getElementById('mode-select-btn'),
+                text: document.getElementById('mode-text-btn'),
+                redact: document.getElementById('mode-whiteout-btn')
+            };
+            Object.entries(map).forEach(([key, btn]) => {
+                if (!btn) return;
+                btn.className = key === mode ? modeBtnOn : modeBtnOff;
+            });
+            const hint = document.getElementById('edit-mode-hint');
+            if (hint) {
+                if (mode === 'select') hint.textContent = 'Select mode: click a highlighted text line on the page to change it. Original text is permanently removed and replaced.';
+                else if (mode === 'text') hint.textContent = 'Add Text: click anywhere on the page to place new text.';
+                else hint.textContent = 'Redact: click and drag on the page to permanently remove content under the box.';
+            }
+            const glass = document.getElementById('stamp-glass-layer');
+            if (glass) {
+                glass.style.cursor = mode === 'redact' ? 'crosshair' : (mode === 'text' ? 'text' : 'default');
+                glass.style.pointerEvents = 'auto';
+            }
+            renderEditSpanOverlays();
+        }
+
+        function clearPendingEdits() {
+            pendingEdits = [];
+            updateEditTracker();
+            renderEditSpanOverlays();
+            showToast('Pending edits cleared.', 'success');
+        }
+
+        function updateEditTracker() {
+            const list = document.getElementById('stamp-tracker-list');
+            const applyBtn = document.getElementById('stamp-apply-btn');
+            if (!list || !applyBtn) return;
+            if (pendingEdits.length === 0) {
+                list.innerHTML = '<span class="italic text-slate-400">No edits yet. Upload a PDF and click text to start.</span>';
+                applyBtn.disabled = true;
+                return;
+            }
+            applyBtn.disabled = false;
+            list.innerHTML = '';
+            pendingEdits.forEach((ed, idx) => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between bg-white dark:bg-slate-900 p-1.5 rounded border border-slate-100 dark:border-slate-800 text-xs gap-2';
+                const label = document.createElement('span');
+                label.className = 'truncate font-medium text-slate-700 dark:text-slate-300';
+                let text = `${idx + 1}. p${(ed.page || 0) + 1} `;
+                if (ed.type === 'replace') text += `Edit: "${ed.text || '...'}"`;
+                else if (ed.type === 'redact') text += 'Redact region';
+                else if (ed.type === 'add_text') text += `Add: "${ed.text || '...'}"`;
+                else text += ed.type;
+                label.textContent = text;
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'text-red-500 hover:text-red-700 font-bold px-1 shrink-0';
+                del.textContent = '✕';
+                del.onclick = () => {
+                    pendingEdits = pendingEdits.filter(x => x.id !== ed.id);
+                    updateEditTracker();
+                    renderEditSpanOverlays();
+                };
+                row.appendChild(label);
+                row.appendChild(del);
+                list.appendChild(row);
+            });
+        }
+
+        async function loadEditInspector() {
+            if (!currentUploadedFiles.length) return;
+            showLoadingState();
+            const formData = new FormData();
+            formData.append('file', currentUploadedFiles[0]);
+            formData.append('page_index', String(editPageIndex));
+            try {
+                const response = await fetch('/api/edit/inspect', { method: 'POST', body: formData });
+                if (!response.ok) {
+                    const detail = await readErrorDetail(response);
+                    showToast(detail, 'error');
+                    resetPreview();
+                    return;
+                }
+                const data = await response.json();
+                editTotalPages = data.total_pages || 1;
+                editSpans = data.spans || [];
+                document.getElementById('preview-filename').textContent = data.filename || currentUploadedFiles[0].name;
+                document.getElementById('preview-pages').textContent = `Edit page ${editPageIndex + 1} / ${editTotalPages} · ${editSpans.length} text lines`;
+                document.getElementById('preview-image').src = data.preview_image;
+                document.getElementById('preview-image').classList.add('bg-white', 'shadow-2xl', 'border', 'dark:border-slate-700');
+
+                const nav = document.getElementById('edit-page-nav');
+                nav.classList.remove('hidden');
+                nav.classList.add('flex');
+                document.getElementById('edit-page-label').textContent = `Page ${editPageIndex + 1} / ${editTotalPages}`;
+                document.getElementById('edit-prev-page').disabled = editPageIndex <= 0;
+                document.getElementById('edit-next-page').disabled = editPageIndex >= editTotalPages - 1;
+
+                activateSingleView();
+                // Enable interaction layer
+                const glass = document.getElementById('stamp-glass-layer');
+                glass.style.pointerEvents = 'auto';
+                setStampMode(currentStampMode || 'select');
+                // Wait for image layout then draw overlays
+                const img = document.getElementById('preview-image');
+                if (img.complete) renderEditSpanOverlays();
+                else img.onload = () => renderEditSpanOverlays();
+            } catch (err) {
+                showToast('Failed to load editor.', 'error');
+                resetPreview();
+            }
+        }
+
+        function changeEditPage(delta) {
+            const next = editPageIndex + delta;
+            if (next < 0 || next >= editTotalPages) return;
+            editPageIndex = next;
+            loadEditInspector();
+        }
+
+        function renderEditSpanOverlays() {
+            const glass = document.getElementById('stamp-glass-layer');
+            const img = document.getElementById('preview-image');
+            if (!glass || !img || currentActiveTool !== 'stamp') return;
+            glass.innerHTML = '';
+            glass.style.pointerEvents = 'auto';
+
+            // Existing span hit-targets (select mode)
+            if (currentStampMode === 'select') {
+                editSpans.forEach(span => {
+                    const box = document.createElement('div');
+                    box.className = 'absolute border border-sky-400/70 bg-sky-400/10 hover:bg-sky-400/25 hover:border-sky-500 cursor-text rounded-[2px] transition-colors';
+                    box.style.left = (span.bbox.x0 * 100) + '%';
+                    box.style.top = (span.bbox.y0 * 100) + '%';
+                    box.style.width = ((span.bbox.x1 - span.bbox.x0) * 100) + '%';
+                    box.style.height = ((span.bbox.y1 - span.bbox.y0) * 100) + '%';
+                    box.title = span.text;
+                    box.onclick = (e) => {
+                        e.stopPropagation();
+                        openSpanEditor(span, box);
+                    };
+                    // Dim if already replaced/redacted in pending
+                    const touched = pendingEdits.some(ed =>
+                        ed.page === editPageIndex &&
+                        (ed.type === 'replace' || ed.type === 'redact') &&
+                        ed.spanId === span.id
+                    );
+                    if (touched) {
+                        box.classList.add('opacity-30', 'line-through');
+                    }
+                    glass.appendChild(box);
+                });
+            }
+
+            // Visual markers for pending add_text / redact on this page
+            pendingEdits.filter(ed => ed.page === editPageIndex).forEach(ed => {
+                if (ed.type === 'add_text') {
+                    const marker = document.createElement('div');
+                    marker.className = 'absolute pointer-events-none text-sky-700 dark:text-sky-300 font-medium bg-sky-100/80 dark:bg-sky-900/70 px-1 rounded border border-sky-400';
+                    marker.style.left = (ed.x * 100) + '%';
+                    marker.style.top = (ed.y * 100) + '%';
+                    marker.style.fontSize = (ed.size || 12) + 'px';
+                    marker.textContent = ed.text || '…';
+                    glass.appendChild(marker);
+                } else if (ed.type === 'redact' && ed.bbox) {
+                    const r = document.createElement('div');
+                    r.className = 'absolute pointer-events-none bg-black/80 border border-red-500';
+                    r.style.left = (ed.bbox.x0 * 100) + '%';
+                    r.style.top = (ed.bbox.y0 * 100) + '%';
+                    r.style.width = ((ed.bbox.x1 - ed.bbox.x0) * 100) + '%';
+                    r.style.height = ((ed.bbox.y1 - ed.bbox.y0) * 100) + '%';
+                    glass.appendChild(r);
+                }
+            });
+        }
+
+        function openSpanEditor(span, boxEl) {
+            const glass = document.getElementById('stamp-glass-layer');
+            // Remove any open inline editors
+            glass.querySelectorAll('.js-inline-editor').forEach(n => n.remove());
+
+            const editor = document.createElement('div');
+            editor.className = 'js-inline-editor absolute z-50 flex flex-col gap-1 p-1.5 bg-white dark:bg-slate-900 border-2 border-sky-500 rounded-lg shadow-xl';
+            editor.style.left = (span.bbox.x0 * 100) + '%';
+            editor.style.top = (span.bbox.y0 * 100) + '%';
+            editor.style.minWidth = Math.max(120, (span.bbox.x1 - span.bbox.x0) * glass.clientWidth) + 'px';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = span.text;
+            input.className = 'w-full text-sm border border-slate-200 dark:border-slate-700 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-white';
+            input.style.fontSize = Math.max(11, span.size || 12) + 'px';
+
+            const actions = document.createElement('div');
+            actions.className = 'flex gap-1 justify-end';
+            const save = document.createElement('button');
+            save.type = 'button';
+            save.className = 'px-2 py-0.5 text-[11px] font-bold rounded bg-sky-600 text-white';
+            save.textContent = 'Replace';
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'px-2 py-0.5 text-[11px] font-bold rounded bg-red-600 text-white';
+            del.textContent = 'Delete';
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'px-2 py-0.5 text-[11px] font-bold rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200';
+            cancel.textContent = 'Cancel';
+
+            save.onclick = (e) => {
+                e.stopPropagation();
+                const newText = input.value;
+                // Remove prior edit on same span
+                pendingEdits = pendingEdits.filter(ed => !(ed.page === editPageIndex && ed.spanId === span.id));
+                if (newText.trim() === '') {
+                    pendingEdits.push({
+                        id: 'ed_' + Date.now(),
+                        type: 'redact',
+                        page: editPageIndex,
+                        spanId: span.id,
+                        bbox: { ...span.bbox }
+                    });
+                } else {
+                    pendingEdits.push({
+                        id: 'ed_' + Date.now(),
+                        type: 'replace',
+                        page: editPageIndex,
+                        spanId: span.id,
+                        bbox: { ...span.bbox },
+                        text: newText,
+                        size: span.size || Number(document.getElementById('stamp-font-size').value),
+                        color: span.color || [0, 0, 0]
+                    });
+                }
+                editor.remove();
+                updateEditTracker();
+                renderEditSpanOverlays();
+            };
+            del.onclick = (e) => {
+                e.stopPropagation();
+                pendingEdits = pendingEdits.filter(ed => !(ed.page === editPageIndex && ed.spanId === span.id));
+                pendingEdits.push({
+                    id: 'ed_' + Date.now(),
+                    type: 'redact',
+                    page: editPageIndex,
+                    spanId: span.id,
+                    bbox: { ...span.bbox }
+                });
+                editor.remove();
+                updateEditTracker();
+                renderEditSpanOverlays();
+            };
+            cancel.onclick = (e) => { e.stopPropagation(); editor.remove(); };
+
+            actions.appendChild(cancel);
+            actions.appendChild(del);
+            actions.appendChild(save);
+            editor.appendChild(input);
+            editor.appendChild(actions);
+            glass.appendChild(editor);
+            input.focus();
+            input.select();
+            input.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter') save.click();
+                if (ev.key === 'Escape') cancel.click();
+            });
+        }
+
+        // Glass layer interactions for add text / redact
+        (function setupEditGlass() {
+            const glass = document.getElementById('stamp-glass-layer');
+            if (!glass) return;
+
+            glass.addEventListener('click', (e) => {
+                if (currentActiveTool !== 'stamp') return;
+                if (currentStampMode !== 'text') return;
+                if (e.target !== glass && !e.target.classList.contains('js-glass-hit')) return;
+
+                const rect = glass.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width;
+                const y = (e.clientY - rect.top) / rect.height;
+                const size = Number(document.getElementById('stamp-font-size').value) || 12;
+                const text = prompt('Text to insert:', '');
+                if (text === null) return;
+                if (!text.trim()) return;
+                pendingEdits.push({
+                    id: 'ed_' + Date.now(),
+                    type: 'add_text',
+                    page: editPageIndex,
+                    x, y, text, size,
+                    color: [0, 0, 0]
+                });
+                updateEditTracker();
+                renderEditSpanOverlays();
+            });
+
+            glass.addEventListener('mousedown', (e) => {
+                if (currentActiveTool !== 'stamp' || currentStampMode !== 'redact') return;
+                if (e.target.closest('.js-inline-editor')) return;
+                e.preventDefault();
+                const rect = glass.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width;
+                const y = (e.clientY - rect.top) / rect.height;
+                redactDrag = { x0: x, y0: y, x1: x, y1: y, el: null };
+                const box = document.createElement('div');
+                box.className = 'absolute border-2 border-dashed border-red-500 bg-red-500/20 pointer-events-none z-50';
+                glass.appendChild(box);
+                redactDrag.el = box;
+                updateRedactBox();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!redactDrag) return;
+                const glassEl = document.getElementById('stamp-glass-layer');
+                const rect = glassEl.getBoundingClientRect();
+                redactDrag.x1 = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+                redactDrag.y1 = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+                updateRedactBox();
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (!redactDrag) return;
+                const { x0, y0, x1, y1, el } = redactDrag;
+                if (el) el.remove();
+                redactDrag = null;
+                const bbox = {
+                    x0: Math.min(x0, x1),
+                    y0: Math.min(y0, y1),
+                    x1: Math.max(x0, x1),
+                    y1: Math.max(y0, y1)
+                };
+                const w = bbox.x1 - bbox.x0;
+                const h = bbox.y1 - bbox.y0;
+                if (w < 0.01 || h < 0.008) return; // ignore tiny clicks
+                pendingEdits.push({
+                    id: 'ed_' + Date.now(),
+                    type: 'redact',
+                    page: editPageIndex,
+                    bbox
+                });
+                updateEditTracker();
+                renderEditSpanOverlays();
+            });
+
+            function updateRedactBox() {
+                if (!redactDrag || !redactDrag.el) return;
+                const x = Math.min(redactDrag.x0, redactDrag.x1);
+                const y = Math.min(redactDrag.y0, redactDrag.y1);
+                const w = Math.abs(redactDrag.x1 - redactDrag.x0);
+                const h = Math.abs(redactDrag.y1 - redactDrag.y0);
+                redactDrag.el.style.left = (x * 100) + '%';
+                redactDrag.el.style.top = (y * 100) + '%';
+                redactDrag.el.style.width = (w * 100) + '%';
+                redactDrag.el.style.height = (h * 100) + '%';
+            }
+        })();
+
+        async function applyEditsToPDF() {
+            if (!currentUploadedFiles.length || pendingEdits.length === 0) return;
+            const btn = document.getElementById('stamp-apply-btn');
+            const ops = pendingEdits.map(ed => {
+                if (ed.type === 'replace') {
+                    return { type: 'replace', page: ed.page, bbox: ed.bbox, text: ed.text, size: ed.size, color: ed.color };
+                }
+                if (ed.type === 'redact') {
+                    return { type: 'redact', page: ed.page, bbox: ed.bbox };
+                }
+                if (ed.type === 'add_text') {
+                    return { type: 'add_text', page: ed.page, x: ed.x, y: ed.y, text: ed.text, size: ed.size, color: ed.color };
+                }
+                return ed;
+            });
+
+            const formData = new FormData();
+            formData.append('file', currentUploadedFiles[0]);
+            formData.append('operations', JSON.stringify(ops));
+
+            btn.textContent = 'Applying edits…';
+            btn.disabled = true;
+            try {
+                const response = await fetch('/api/edit/apply', { method: 'POST', body: formData });
+                if (!response.ok) {
+                    showToast(await readErrorDetail(response), 'error');
+                    return;
+                }
+                const blob = await response.blob();
+                const filename = 'edited_' + (currentUploadedFiles[0].name || 'document.pdf');
+                // Download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = filename; a.click();
+                // Keep editing session: replace in-memory file with edited PDF
+                const editedFile = new File([blob], filename, { type: 'application/pdf' });
+                currentUploadedFiles = [editedFile];
+                pendingEdits = [];
+                updateEditTracker();
+                showToast('Edits applied. You can keep editing the new version.', 'success');
+                await loadEditInspector();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                showToast('Connection error while applying edits.', 'error');
+            } finally {
+                btn.textContent = 'Apply edits & download';
+                btn.disabled = pendingEdits.length === 0;
+            }
+        }
+
+        // Hook tool switch + file select for editor
+        const originalSwitch = window.switchTool;
+        window.switchTool = function(tool) {
+            originalSwitch(tool);
+            const glass = document.getElementById('stamp-glass-layer');
+            if (glass) {
+                glass.innerHTML = '';
+                glass.style.pointerEvents = tool === 'stamp' ? 'auto' : 'none';
+            }
+            const nav = document.getElementById('edit-page-nav');
+            if (nav && tool !== 'stamp') {
+                nav.classList.add('hidden');
+                nav.classList.remove('flex');
+            }
+            if (tool === 'stamp') {
+                editPageIndex = 0;
+                setStampMode('select');
+            }
+            renderMergeStagingList();
+        };
+
+        const originalTrigger = triggerFileSelect;
+        triggerFileSelect = async function(inputElement) {
+            if (!inputElement.files || inputElement.files.length === 0) { resetPreview(); return; }
+            // If stamp tool, use content editor path
+            if (currentActiveTool === 'stamp' || inputElement.id === 'stamp-input') {
+                currentUploadedFiles = Array.from(inputElement.files);
+                editPageIndex = 0;
+                pendingEdits = [];
+                updateEditTracker();
+                await loadEditInspector();
+                return;
+            }
+            return originalTrigger(inputElement);
+        };
+        // --- MERGE SEQUENCE REORDERING ENGINE ---
+        let dragStartIndex = -1;
+
+        function renderMergeStagingList() {
+            const container = document.getElementById('merge-staging-area');
+            const listEl = document.getElementById('merge-file-list');
+            const countBadge = document.getElementById('merge-file-count');
+
+            // Only show staging list if we are in the merge tool and have files
+            if (currentActiveTool !== 'merge' || currentUploadedFiles.length === 0) {
+                container.classList.add('hidden');
+                container.classList.remove('flex');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            container.classList.add('flex');
+            countBadge.innerText = `${currentUploadedFiles.length} file${currentUploadedFiles.length > 1 ? 's' : ''}`;
+            listEl.innerHTML = '';
+
+            currentUploadedFiles.forEach((file, index) => {
+                const card = document.createElement('div');
+                card.className = "flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm transition-all cursor-move hover:border-indigo-400 dark:hover:border-indigo-500";
+                card.setAttribute('draggable', 'true');
+                card.setAttribute('data-index', index);
+
+                // HTML5 Drag & Drop Event Listeners
+                card.addEventListener('dragstart', (e) => {
+                    dragStartIndex = index;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => card.classList.add('opacity-40', 'border-dashed', 'border-indigo-500'), 0);
+                });
+
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('opacity-40', 'border-dashed', 'border-indigo-500');
+                    dragStartIndex = -1;
+                });
+
+                card.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                });
+
+                card.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const dragEndIndex = index;
+                    if (dragStartIndex !== -1 && dragStartIndex !== dragEndIndex) {
+                        reorderMergeArray(dragStartIndex, dragEndIndex);
+                    }
+                });
+
+                // Card Content (Sequence Badge + Name + Controls) — textContent for filenames (XSS-safe)
+                card.innerHTML = `
+                    <div class="flex items-center space-x-3 truncate pr-2">
+                        <div class="flex-shrink-0 w-6 h-6 bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 font-bold text-xs rounded-full flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
+                            ${index + 1}
+                        </div>
+                        <div class="truncate">
+                            <p class="js-merge-name text-xs font-semibold text-slate-800 dark:text-slate-200 truncate"></p>
+                            <p class="text-[10px] text-slate-400 font-mono">${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-1 flex-shrink-0">
+                        <button onclick="moveFileDirection(${index}, -1); event.stopPropagation();" class="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-20 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Move Up" ${index === 0 ? 'disabled' : ''}>
+                            ▲
+                        </button>
+                        <button onclick="moveFileDirection(${index}, 1); event.stopPropagation();" class="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-20 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Move Down" ${index === currentUploadedFiles.length - 1 ? 'disabled' : ''}>
+                            ▼
+                        </button>
+                        <button onclick="removeMergeFile(${index}); event.stopPropagation();" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded ml-1" title="Remove File">
+                            ✕
+                        </button>
+                    </div>
+                `;
+                card.querySelector('.js-merge-name').textContent = file.name;
+                listEl.appendChild(card);
+            });
+        }
+
+        // Array Manipulation Helpers
+        function reorderMergeArray(fromIndex, toIndex) {
+            const movedFile = currentUploadedFiles.splice(fromIndex, 1)[0];
+            currentUploadedFiles.splice(toIndex, 0, movedFile);
+            renderMergeStagingList();
+        }
+
+        function moveFileDirection(index, direction) {
+            const targetIndex = index + direction;
+            if (targetIndex >= 0 && targetIndex < currentUploadedFiles.length) {
+                reorderMergeArray(index, targetIndex);
+            }
+        }
+
+        function removeMergeFile(index) {
+            currentUploadedFiles.splice(index, 1);
+            renderMergeStagingList();
+            if (currentUploadedFiles.length === 0) {
+                document.getElementById('merge-btn').disabled = true;
+            }
+        }
     </script>
 </body>
 </html>
