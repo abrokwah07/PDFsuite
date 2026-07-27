@@ -14,7 +14,8 @@ from app.config import Settings
 _UNSAFE_NAME = re.compile(r"[^\w.\- ()[\]]+", re.UNICODE)
 
 PDF_EXTENSIONS = {".pdf"}
-OFFICE_TO_PDF_EXTENSIONS = {".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"}
+OFFICE_TO_PDF_EXTENSIONS = {".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".odp", ".ods"}
+OFFICE_CROSS_CONVERT_EXTENSIONS = OFFICE_TO_PDF_EXTENSIONS
 OFFICE_COMPRESS_EXTENSIONS = {".docx", ".pptx"}
 ALLOWED_UPLOAD_EXTENSIONS = PDF_EXTENSIONS | OFFICE_TO_PDF_EXTENSIONS
 

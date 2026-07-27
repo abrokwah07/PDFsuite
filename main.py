@@ -53,8 +53,15 @@ from app.jobs import JobStatus, JobStore
 from app.middleware import RequestContextMiddleware
 from app.office_compress import compress_ooxml
 from app.pdf_editor import apply_edits, inspect_page
+from app.pptx_convert import (
+    OFFICE_FORMAT_MAP,
+    libreoffice_convert,
+    media_type_for_ext,
+    pdf_to_pptx,
+)
 from app.security import (
     OFFICE_COMPRESS_EXTENSIONS,
+    OFFICE_CROSS_CONVERT_EXTENSIONS,
     OFFICE_TO_PDF_EXTENSIONS,
     PDF_EXTENSIONS,
     assert_zip_safe,
@@ -282,6 +289,7 @@ def create_app() -> FastAPI:
                     "max_concurrent_jobs": settings.max_concurrent_jobs,
                     "auto_chunk_merge": True,
                     "background_jobs": True,
+                    "max_pptx_pages": settings.max_pptx_total_pages,
                 },
             },
         )
@@ -593,6 +601,334 @@ def create_app() -> FastAPI:
             )
             for p in temps:
                 safe_unlink(p)
+
+    def _run_pptx_job(
+        job_id: str,
+        store: JobStore,
+        settings: Settings,
+        *,
+        input_path: str,
+        name: str,
+        pages: str,
+    ) -> None:
+        output_pptx = make_temp_path(".pptx", settings)
+        job = store.get(job_id)
+        if job:
+            job.cleanup_paths.extend([input_path, output_pptx])
+
+        def cancelled() -> bool:
+            j = store.get(job_id)
+            return bool(j and j.cancelled())
+
+        def on_prog(cur: int, tot: int) -> None:
+            store.update(
+                job_id,
+                progress=5 + (cur / tot * 90 if tot else 0),
+                current=cur,
+                total=tot,
+                phase="converting",
+                message=f"Slide {cur} of {tot}",
+            )
+
+        try:
+            store.update(
+                job_id,
+                status=JobStatus.running,
+                progress=3,
+                phase="preparing",
+                message="Counting pages…",
+            )
+            total = count_pages(input_path)
+            indices = resolve_pages(
+                total_pages=total,
+                pages=pages,
+                max_total=settings.max_pptx_total_pages,
+                label="PDF → PowerPoint",
+            )
+            store.update(
+                job_id,
+                total=len(indices),
+                progress=5,
+                phase="converting",
+                message=f"Building {len(indices)} slides…",
+            )
+            if cancelled():
+                raise RuntimeError("cancelled")
+
+            pdf_to_pptx(
+                input_path,
+                output_pptx,
+                indices,
+                on_progress=on_prog,
+                should_cancel=cancelled,
+            )
+            if cancelled():
+                raise RuntimeError("cancelled")
+
+            base_name = Path(name).stem
+            if total > 0 and len(indices) < total:
+                fname = f"{base_name}_p{indices[0] + 1}-{indices[-1] + 1}.pptx"
+            else:
+                fname = f"{base_name}.pptx"
+            label = pages_label(indices, total, chunks=1)
+            store.update(
+                job_id,
+                status=JobStatus.completed,
+                progress=100,
+                phase="done",
+                message=f"Done — {label}",
+                current=len(indices),
+                total=len(indices),
+                result_path=output_pptx,
+                result_name=fname,
+                media_type=media_type_for_ext("pptx"),
+            )
+            j = store.get(job_id)
+            if j:
+                j.meta["pages_label"] = label
+                j.meta["engine"] = "pdf-image-slides"
+        except RuntimeError as exc:
+            if str(exc) == "cancelled":
+                store.update(
+                    job_id,
+                    status=JobStatus.cancelled,
+                    phase="cancelled",
+                    message="Cancelled",
+                )
+                safe_unlink(output_pptx)
+            else:
+                store.update(
+                    job_id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc),
+                    error=str(exc),
+                )
+                safe_unlink(output_pptx)
+        except Exception as exc:
+            logger.exception("pptx job %s failed", job_id)
+            detail = getattr(exc, "detail", None) or str(exc) or "Conversion failed"
+            if not isinstance(detail, str):
+                detail = str(detail)
+            store.update(
+                job_id,
+                status=JobStatus.failed,
+                phase="error",
+                message=detail,
+                error=detail,
+            )
+            safe_unlink(output_pptx)
+
+    def _run_office_format_job(
+        job_id: str,
+        store: JobStore,
+        settings: Settings,
+        *,
+        libreoffice_path: str,
+        input_path: str,
+        name: str,
+        target: str,
+    ) -> None:
+        temp_dir = make_temp_dir(settings)
+        job = store.get(job_id)
+        if job:
+            job.cleanup_paths.extend([input_path, temp_dir])
+
+        def cancelled() -> bool:
+            j = store.get(job_id)
+            return bool(j and j.cancelled())
+
+        try:
+            store.update(
+                job_id,
+                status=JobStatus.running,
+                progress=10,
+                phase="converting",
+                message=f"LibreOffice → {target}…",
+            )
+            if cancelled():
+                raise RuntimeError("cancelled")
+
+            # Copy input into temp dir with safe name (LO is picky)
+            safe_in = os.path.join(temp_dir, name)
+            shutil.copy2(input_path, safe_in)
+
+            store.update(job_id, progress=40, message="Running LibreOffice…")
+            out_path = libreoffice_convert(
+                libreoffice_path=libreoffice_path,
+                input_path=safe_in,
+                output_dir=temp_dir,
+                target_ext=target,
+                run_subprocess=run_subprocess,
+                settings=settings,
+            )
+            if cancelled():
+                raise RuntimeError("cancelled")
+
+            # Copy result out so we can wipe temp dir later
+            final_path = make_temp_path(f".{target}", settings)
+            shutil.copy2(out_path, final_path)
+            if job:
+                job.cleanup_paths.append(final_path)
+
+            base = Path(name).stem
+            fname = f"{base}.{target}"
+            store.update(
+                job_id,
+                status=JobStatus.completed,
+                progress=100,
+                phase="done",
+                message=f"Converted to {target.upper()}",
+                result_path=final_path,
+                result_name=fname,
+                media_type=media_type_for_ext(target),
+            )
+            safe_rmtree(temp_dir)
+        except RuntimeError as exc:
+            if str(exc) == "cancelled":
+                store.update(
+                    job_id,
+                    status=JobStatus.cancelled,
+                    phase="cancelled",
+                    message="Cancelled",
+                )
+            else:
+                store.update(
+                    job_id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc),
+                    error=str(exc),
+                )
+            safe_rmtree(temp_dir)
+        except Exception as exc:
+            logger.exception("office format job %s failed", job_id)
+            detail = getattr(exc, "detail", None) or str(exc) or "Conversion failed"
+            if not isinstance(detail, str):
+                detail = str(detail)
+            store.update(
+                job_id,
+                status=JobStatus.failed,
+                phase="error",
+                message=detail,
+                error=detail,
+            )
+            safe_rmtree(temp_dir)
+
+    @app.post("/api/jobs/convert/to-pptx")
+    async def job_convert_to_pptx(
+        request: Request,
+        file: UploadFile = File(...),
+        pages: str = Form(""),
+    ):
+        """PDF → PowerPoint (one image slide per page). Background job with progress."""
+        settings = _settings(request)
+        store = _job_store(request)
+        name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
+        input_path = write_bytes(data, ".pdf", settings)
+        job = store.create(kind="convert_to_pptx", filename=name)
+        job.cleanup_paths.append(input_path)
+        store.update(job.id, phase="queued", message="Queued…", progress=1)
+
+        async def _runner() -> None:
+            try:
+                async with _limiter(request).slot(label="conversion job"):
+                    await asyncio.to_thread(
+                        _run_pptx_job,
+                        job.id,
+                        store,
+                        settings,
+                        input_path=input_path,
+                        name=name,
+                        pages=pages,
+                    )
+            except HTTPException as exc:
+                store.update(
+                    job.id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc.detail),
+                    error=str(exc.detail),
+                )
+
+        asyncio.create_task(_runner())
+        return JSONResponse({"job_id": job.id, **job.to_dict()})
+
+    @app.post("/api/jobs/convert/office")
+    async def job_convert_office(
+        request: Request,
+        file: UploadFile = File(...),
+        target: str = Form(...),
+    ):
+        """
+        Cross-format Office conversion via LibreOffice, e.g.:
+        PPTX → PDF/DOCX, DOCX → PPTX/PDF, XLSX → PDF/PPTX, etc.
+        """
+        settings = _settings(request)
+
+        target_norm = (target or "").strip().lower().lstrip(".")
+        if target_norm not in {"pdf", "docx", "pptx", "xlsx", "odt", "odp", "ods"}:
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported target. Use pdf, docx, pptx, xlsx, odt, odp, or ods.",
+            )
+
+        name, data = await read_upload(
+            file,
+            settings,
+            allowed_extensions=OFFICE_CROSS_CONVERT_EXTENSIONS,
+            label="Office document",
+        )
+        src_ext = Path(name).suffix.lower()
+        if src_ext.lstrip(".") == target_norm:
+            raise HTTPException(status_code=400, detail="Source and target formats are the same.")
+        allowed_targets = OFFICE_FORMAT_MAP.get(src_ext)
+        if not allowed_targets or target_norm not in allowed_targets:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot convert {src_ext or 'this file'} → .{target_norm}. "
+                    f"Allowed targets: {', '.join(sorted(allowed_targets or [])) or 'none'}."
+                ),
+            )
+
+        if not settings.enable_libreoffice or not request.app.state.libreoffice_path:
+            raise HTTPException(status_code=503, detail="LibreOffice is not available.")
+
+        if src_ext in {".docx", ".xlsx", ".pptx"}:
+            assert_zip_safe(data, settings, label=name)
+
+        input_path = write_bytes(data, src_ext or ".bin", settings)
+        store = _job_store(request)
+        job = store.create(kind="convert_office", filename=name, target=target_norm)
+        job.cleanup_paths.append(input_path)
+        store.update(job.id, phase="queued", message="Queued…", progress=1)
+        lo_path = request.app.state.libreoffice_path
+
+        async def _runner() -> None:
+            try:
+                async with _limiter(request).slot(label="conversion job"):
+                    await asyncio.to_thread(
+                        _run_office_format_job,
+                        job.id,
+                        store,
+                        settings,
+                        libreoffice_path=lo_path,
+                        input_path=input_path,
+                        name=name,
+                        target=target_norm,
+                    )
+            except HTTPException as exc:
+                store.update(
+                    job.id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc.detail),
+                    error=str(exc.detail),
+                )
+
+        asyncio.create_task(_runner())
+        return JSONResponse({"job_id": job.id, **job.to_dict()})
 
     @app.post("/api/jobs/convert/to-word")
     async def job_convert_to_word(

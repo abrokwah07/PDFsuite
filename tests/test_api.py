@@ -328,7 +328,55 @@ def test_compress_office_docx(client: TestClient):
     assert "X-Saved-Percent" in res.headers or len(res.content) <= len(docx)
 
 
+def test_pdf_to_pptx_job(client: TestClient):
+    pdf = _make_pdf_bytes("Slide content")
+    create = client.post(
+        "/api/jobs/convert/to-pptx",
+        files={"file": ("deck.pdf", pdf, "application/pdf")},
+        data={"pages": "1"},
+    )
+    assert create.status_code == 200, create.text
+    job_id = create.json()["job_id"]
+    import time
+
+    job = {}
+    for _ in range(60):
+        st = client.get(f"/api/jobs/{job_id}")
+        job = st.json()
+        if job["status"] in ("completed", "failed", "cancelled"):
+            break
+        time.sleep(0.05)
+    assert job["status"] == "completed", job
+    dl = client.get(f"/api/jobs/{job_id}/download")
+    assert dl.status_code == 200
+    assert dl.content[:2] == b"PK"  # pptx is a zip
+
+
+def test_office_format_reject_same(client: TestClient):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>',
+        )
+        zf.writestr("ppt/presentation.xml", "<p:presentation/>")
+    pptx = buf.getvalue()
+    res = client.post(
+        "/api/jobs/convert/office",
+        files={
+            "file": (
+                "a.pptx",
+                pptx,
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            )
+        },
+        data={"target": "pptx"},
+    )
+    assert res.status_code == 400
+
+
 def test_background_word_job(client: TestClient):
+
     pdf = _make_pdf_bytes("Job convert me")
     create = client.post(
         "/api/jobs/convert/to-word",

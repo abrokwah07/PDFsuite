@@ -51,7 +51,7 @@ class Settings:
     """Enterprise-oriented defaults for Local PDF Suite."""
 
     app_name: str = "Local PDF Suite"
-    app_version: str = "1.3.0"
+    app_version: str = "1.3.1"
     environment: str = "production"
 
     # Network
@@ -70,6 +70,7 @@ class Settings:
     excel_chunk_pages: int = 50
     max_word_total_pages: int = 8000  # hard safety ceiling for one job
     max_excel_total_pages: int = 3000
+    max_pptx_total_pages: int = 500  # image slides are heavy on RAM
     # Back-compat aliases used by older code paths / tests
     max_word_pages: int = 8000
     max_excel_pages: int = 3000
@@ -121,7 +122,7 @@ def get_settings() -> Settings:
 
     return Settings(
         app_name=os.getenv("APP_NAME", "Local PDF Suite"),
-        app_version=os.getenv("APP_VERSION", "1.3.0"),
+        app_version=os.getenv("APP_VERSION", "1.3.1"),
         environment=os.getenv("APP_ENV", "production"),
         host=os.getenv("HOST", default_host),
         port=_env_int("PORT", 8000),
@@ -135,6 +136,7 @@ def get_settings() -> Settings:
         excel_chunk_pages=_env_int("EXCEL_CHUNK_PAGES", 50),
         max_word_total_pages=_env_int("MAX_WORD_TOTAL_PAGES", 8000),
         max_excel_total_pages=_env_int("MAX_EXCEL_TOTAL_PAGES", 3000),
+        max_pptx_total_pages=_env_int("MAX_PPTX_TOTAL_PAGES", 500),
         # Prefer new total caps; fall back to legacy MAX_WORD_PAGES if only that is set
         max_word_pages=_env_int(
             "MAX_WORD_TOTAL_PAGES",
