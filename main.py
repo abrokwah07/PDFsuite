@@ -49,7 +49,9 @@ from app.conversion import (
     write_page_subset,
 )
 from app.job_limit import JobLimiter, RateLimiter
+from app.jobs import JobStatus, JobStore
 from app.middleware import RequestContextMiddleware
+from app.office_compress import compress_ooxml
 from app.pdf_editor import apply_edits, inspect_page
 from app.security import (
     OFFICE_COMPRESS_EXTENSIONS,
@@ -127,6 +129,7 @@ async def lifespan(app: FastAPI):
     app.state.tesseract_path = _which("tesseract")
     app.state.job_limiter = JobLimiter(settings.max_concurrent_jobs)
     app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute)
+    app.state.job_store = JobStore(ttl_seconds=3600, max_jobs=80)
 
     logger.info(
         "Starting %s v%s env=%s gs=%s libreoffice=%s tesseract=%s ocrmypdf=%s camelot=%s api_key=%s",
@@ -278,8 +281,455 @@ def create_app() -> FastAPI:
                     "excel_chunk_pages": settings.excel_chunk_pages,
                     "max_concurrent_jobs": settings.max_concurrent_jobs,
                     "auto_chunk_merge": True,
+                    "background_jobs": True,
                 },
             },
+        )
+
+    # ------------------------------------------------------------------
+    # Background jobs (convert with live progress + cancel)
+    # ------------------------------------------------------------------
+
+    def _job_store(request: Request) -> JobStore:
+        return request.app.state.job_store
+
+    def _run_word_job(
+        job_id: str,
+        store: JobStore,
+        settings: Settings,
+        *,
+        input_path: str,
+        name: str,
+        pages: str,
+        mode: str,
+        gs_libre: object = None,
+    ) -> None:
+        """Synchronous worker for PDF → Word (runs in a thread)."""
+        output_docx = make_temp_path(".docx", settings)
+        job = store.get(job_id)
+        if job:
+            job.cleanup_paths.extend([input_path, output_docx])
+
+        def cancelled() -> bool:
+            j = store.get(job_id)
+            return bool(j and j.cancelled())
+
+        def on_prog(cur: int, tot: int) -> None:
+            store.update(
+                job_id,
+                progress=5 + (cur / tot * 90 if tot else 0),
+                current=cur,
+                total=tot,
+                phase="converting",
+                message=f"Page {cur} of {tot}",
+            )
+
+        try:
+            store.update(
+                job_id,
+                status=JobStatus.running,
+                progress=3,
+                phase="preparing",
+                message="Counting pages…",
+            )
+            total = count_pages(input_path)
+            indices = resolve_pages(
+                total_pages=total,
+                pages=pages,
+                max_total=settings.max_word_total_pages,
+                label="PDF → Word",
+            )
+            mode_norm = (mode or "auto").strip().lower()
+            use_layout = mode_norm == "layout" or (
+                mode_norm == "auto" and len(indices) <= settings.word_layout_page_threshold
+            )
+            if use_layout and Converter is None:
+                use_layout = False
+
+            store.update(
+                job_id,
+                total=len(indices),
+                progress=5,
+                phase="converting",
+                message=f"Converting {len(indices)} pages ({'layout' if use_layout else 'fast'})…",
+            )
+            if cancelled():
+                raise RuntimeError("cancelled")
+
+            if use_layout:
+                local_cleanup: list[str] = []
+                try:
+                    _pages, chunks_used = convert_word_layout_chunked(
+                        input_path=input_path,
+                        output_path=output_docx,
+                        indices=indices,
+                        chunk_size=settings.word_chunk_pages,
+                        converter_cls=Converter,
+                        make_temp=lambda s: make_temp_path(s, settings),
+                        cleanup=local_cleanup,
+                        on_progress=on_prog,
+                        should_cancel=cancelled,
+                    )
+                finally:
+                    for p in local_cleanup:
+                        safe_unlink(p)
+                label = pages_label(indices, total, chunks=chunks_used)
+                engine = "layout"
+            else:
+                pdf_to_docx_fast(
+                    input_path,
+                    output_docx,
+                    indices,
+                    on_progress=on_prog,
+                    should_cancel=cancelled,
+                )
+                label = pages_label(indices, total, chunks=1)
+                engine = "fast"
+
+            if cancelled():
+                raise RuntimeError("cancelled")
+
+            base_name = Path(name).stem
+            if total > 0 and len(indices) < total:
+                fname = f"{base_name}_p{indices[0] + 1}-{indices[-1] + 1}.docx"
+            else:
+                fname = f"{base_name}.docx"
+
+            store.update(
+                job_id,
+                status=JobStatus.completed,
+                progress=100,
+                phase="done",
+                message=f"Done — {label}",
+                current=len(indices),
+                total=len(indices),
+                result_path=output_docx,
+                result_name=fname,
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+            j = store.get(job_id)
+            if j:
+                j.meta["engine"] = engine
+                j.meta["pages_label"] = label
+        except RuntimeError as exc:
+            if str(exc) == "cancelled":
+                store.update(
+                    job_id,
+                    status=JobStatus.cancelled,
+                    phase="cancelled",
+                    message="Cancelled",
+                    progress=0,
+                )
+                safe_unlink(output_docx)
+            else:
+                store.update(
+                    job_id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc),
+                    error=str(exc),
+                )
+                safe_unlink(output_docx)
+        except Exception as exc:
+            logger.exception("word job %s failed", job_id)
+            detail = getattr(exc, "detail", None) or str(exc) or "Conversion failed"
+            if not isinstance(detail, str):
+                detail = str(detail)
+            store.update(
+                job_id,
+                status=JobStatus.failed,
+                phase="error",
+                message=detail,
+                error=detail,
+            )
+            safe_unlink(output_docx)
+
+    def _run_excel_job(
+        job_id: str,
+        store: JobStore,
+        settings: Settings,
+        *,
+        items: list[tuple[str, str]],
+        pages: str,
+    ) -> None:
+        """Synchronous worker for PDF → Excel."""
+        temps: list[str] = [p for _, p in items]
+        job = store.get(job_id)
+        if job:
+            job.cleanup_paths.extend(temps)
+
+        def cancelled() -> bool:
+            j = store.get(job_id)
+            return bool(j and j.cancelled())
+
+        try:
+            if pd is None:
+                raise RuntimeError("pandas is not installed")
+            store.update(
+                job_id,
+                status=JobStatus.running,
+                progress=3,
+                phase="preparing",
+                message="Extracting tables…",
+            )
+            excel_files: list[tuple[str, str]] = []
+            last_label = ""
+
+            for name, input_path in items:
+                if cancelled():
+                    raise RuntimeError("cancelled")
+                total = count_pages(input_path)
+                indices = resolve_pages(
+                    total_pages=total,
+                    pages=pages,
+                    max_total=settings.max_excel_total_pages,
+                    label="PDF → Excel",
+                )
+                n_chunks = max(
+                    1,
+                    (len(indices) + settings.excel_chunk_pages - 1)
+                    // settings.excel_chunk_pages,
+                )
+                last_label = pages_label(indices, total, chunks=n_chunks)
+
+                def on_prog(cur: int, tot: int) -> None:
+                    store.update(
+                        job_id,
+                        progress=5 + (cur / tot * 90 if tot else 0),
+                        current=cur,
+                        total=tot,
+                        phase="extracting",
+                        message=f"Scanning page {cur} of {tot}",
+                    )
+
+                all_tables = extract_tables_chunked(
+                    input_path,
+                    indices,
+                    chunk_size=settings.excel_chunk_pages,
+                    pd_module=pd,
+                    camelot_module=camelot,
+                    enable_camelot=settings.enable_camelot and camelot is not None,
+                    on_progress=on_prog,
+                    should_cancel=cancelled,
+                )
+                if all_tables:
+                    for i in range(len(all_tables)):
+                        all_tables[i].columns = range(all_tables[i].shape[1])
+                    master_df = pd.concat(all_tables, ignore_index=True)
+                    master_df.dropna(how="all", inplace=True)
+                    out_path = make_temp_path(".xlsx", settings)
+                    temps.append(out_path)
+                    master_df.to_excel(
+                        out_path, index=False, header=False, sheet_name="Master_Data"
+                    )
+                    stem = Path(name).stem
+                    if total > 0 and len(indices) < total:
+                        out_name = f"{stem}_p{indices[0] + 1}-{indices[-1] + 1}.xlsx"
+                    else:
+                        out_name = f"{stem}.xlsx"
+                    excel_files.append((out_name, out_path))
+
+            if cancelled():
+                raise RuntimeError("cancelled")
+            if not excel_files:
+                raise RuntimeError(
+                    "No readable tables found. Try a page range that contains tables."
+                )
+
+            if len(excel_files) == 1:
+                result_path = excel_files[0][1]
+                result_name = excel_files[0][0]
+                media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            else:
+                result_path = make_temp_path(".zip", settings)
+                temps.append(result_path)
+                with zipfile.ZipFile(result_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+                    for arcname, file_path in excel_files:
+                        zipf.write(file_path, arcname=arcname)
+                result_name = "Batch_Excel_Extraction.zip"
+                media = "application/zip"
+
+            store.update(
+                job_id,
+                status=JobStatus.completed,
+                progress=100,
+                phase="done",
+                message=f"Done — {last_label}" if last_label else "Done",
+                result_path=result_path,
+                result_name=result_name,
+                media_type=media,
+            )
+            j = store.get(job_id)
+            if j:
+                j.meta["pages_label"] = last_label
+                # Keep result; clean other temps on discard except result
+                j.cleanup_paths = [p for p in temps if p != result_path]
+        except RuntimeError as exc:
+            if str(exc) == "cancelled":
+                store.update(
+                    job_id,
+                    status=JobStatus.cancelled,
+                    phase="cancelled",
+                    message="Cancelled",
+                )
+            else:
+                store.update(
+                    job_id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc),
+                    error=str(exc),
+                )
+            for p in temps:
+                safe_unlink(p)
+        except Exception as exc:
+            logger.exception("excel job %s failed", job_id)
+            store.update(
+                job_id,
+                status=JobStatus.failed,
+                phase="error",
+                message=str(exc),
+                error=str(exc),
+            )
+            for p in temps:
+                safe_unlink(p)
+
+    @app.post("/api/jobs/convert/to-word")
+    async def job_convert_to_word(
+        request: Request,
+        file: UploadFile = File(...),
+        pages: str = Form(""),
+        mode: str = Form("auto"),
+    ):
+        settings = _settings(request)
+        store = _job_store(request)
+        mode_norm = (mode or "auto").strip().lower()
+        if mode_norm not in {"auto", "layout", "fast"}:
+            raise HTTPException(status_code=400, detail="Invalid mode. Use auto, layout, or fast.")
+
+        name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
+        input_path = write_bytes(data, ".pdf", settings)
+        job = store.create(kind="convert_to_word", filename=name)
+        job.cleanup_paths.append(input_path)
+        store.update(job.id, phase="queued", message="Queued…", progress=1)
+
+        async def _runner() -> None:
+            try:
+                async with _limiter(request).slot(label="conversion job"):
+                    await asyncio.to_thread(
+                        _run_word_job,
+                        job.id,
+                        store,
+                        settings,
+                        input_path=input_path,
+                        name=name,
+                        pages=pages,
+                        mode=mode_norm,
+                    )
+            except HTTPException as exc:
+                store.update(
+                    job.id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc.detail),
+                    error=str(exc.detail),
+                )
+
+        asyncio.create_task(_runner())
+        return JSONResponse({"job_id": job.id, **job.to_dict()})
+
+    @app.post("/api/jobs/convert/to-excel")
+    async def job_convert_to_excel(
+        request: Request,
+        files: List[UploadFile] = File(...),
+        pages: str = Form(""),
+    ):
+        settings = _settings(request)
+        if pd is None:
+            raise HTTPException(status_code=503, detail="pandas is not installed.")
+        store = _job_store(request)
+        validate_file_count(len(files), settings)
+
+        items: list[tuple[str, str]] = []
+        for upload in files:
+            name, data = await read_upload(
+                upload, settings, allowed_extensions=PDF_EXTENSIONS
+            )
+            path = write_bytes(data, ".pdf", settings)
+            items.append((name, path))
+
+        job = store.create(kind="convert_to_excel", files=len(items))
+        job.cleanup_paths.extend(p for _, p in items)
+        store.update(job.id, phase="queued", message="Queued…", progress=1)
+
+        async def _runner() -> None:
+            try:
+                async with _limiter(request).slot(label="extraction job"):
+                    await asyncio.to_thread(
+                        _run_excel_job,
+                        job.id,
+                        store,
+                        settings,
+                        items=items,
+                        pages=pages,
+                    )
+            except HTTPException as exc:
+                store.update(
+                    job.id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc.detail),
+                    error=str(exc.detail),
+                )
+
+        asyncio.create_task(_runner())
+        return JSONResponse({"job_id": job.id, **job.to_dict()})
+
+    @app.get("/api/jobs/{job_id}")
+    async def job_status(request: Request, job_id: str):
+        job = _job_store(request).get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found.")
+        return job.to_dict()
+
+    @app.post("/api/jobs/{job_id}/cancel")
+    async def job_cancel(request: Request, job_id: str):
+        job = _job_store(request).get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found.")
+        if job.status not in {JobStatus.queued, JobStatus.running}:
+            return {**job.to_dict(), "message": "Job is not running."}
+        job.request_cancel()
+        return job.to_dict()
+
+    @app.get("/api/jobs/{job_id}/download")
+    async def job_download(
+        request: Request,
+        background: BackgroundTasks,
+        job_id: str,
+    ):
+        store = _job_store(request)
+        job = store.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found.")
+        if job.status != JobStatus.completed or not job.result_path:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Job is not ready (status={job.status.value}).",
+            )
+        path = job.result_path
+        name = job.result_name or "download.bin"
+        media = job.media_type or "application/octet-stream"
+        # After download, schedule cleanup of this job
+        def _cleanup_job() -> None:
+            store.discard(job_id)
+
+        background.add_task(_cleanup_job)
+        return file_response(
+            path,
+            filename=name,
+            media_type=media,
+            background=background,
         )
 
     # ------------------------------------------------------------------
@@ -1290,18 +1740,17 @@ def create_app() -> FastAPI:
         files: List[UploadFile] = File(...),
         level: str = Form("medium"),
     ):
+        """
+        Aggressively shrink .docx/.pptx by re-encoding embedded images and
+        repacking the OOXML zip at max DEFLATE.
+        """
         settings = _settings(request)
         validate_file_count(len(files), settings)
+        level_norm = (level or "medium").strip().lower()
+        if level_norm not in {"low", "medium", "high"}:
+            level_norm = "medium"
 
-        compression_settings = {
-            "low": {"quality": 85, "max_dim": (1600, 1600)},
-            "medium": {"quality": 50, "max_dim": (1024, 1024)},
-            "high": {"quality": 15, "max_dim": (600, 600)},
-        }
-        cfg = compression_settings.get(level.lower(), compression_settings["medium"])
-        quality = cfg["quality"]
-        max_dim = cfg["max_dim"]
-        processed: list[tuple[str, str]] = []
+        processed: list[tuple[str, str, dict]] = []
 
         try:
             for upload in files:
@@ -1313,73 +1762,67 @@ def create_app() -> FastAPI:
                 )
                 assert_zip_safe(data, settings, label=name)
                 ext = Path(name).suffix.lower()
-                out_zip = make_temp_path(ext, settings)
 
-                with zipfile.ZipFile(io.BytesIO(data), "r") as zin:
-                    with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zout:
-                        for item in zin.infolist():
-                            if not is_safe_zip_member(item.filename):
-                                continue
-                            if item.is_dir():
-                                continue
+                compressed, stats = await asyncio.to_thread(
+                    compress_ooxml, data, level=level_norm
+                )
+                out_path = write_bytes(compressed, ext, settings)
+                processed.append((name, out_path, stats))
+                logger.info(
+                    "office compress %s: %s → %s bytes (%.1f%% saved, %s images)",
+                    name,
+                    stats["original_bytes"],
+                    stats["compressed_bytes"],
+                    stats["saved_percent"],
+                    stats["images_touched"],
+                )
 
-                            member_name = Path(item.filename).as_posix()
-                            buffer = zin.read(item.filename)
-
-                            filename_lower = member_name.lower()
-                            if filename_lower.endswith(
-                                (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".tif", ".webp")
-                            ):
-                                try:
-                                    img = Image.open(io.BytesIO(buffer))
-                                    if img.mode in ("RGBA", "LA") or (
-                                        img.mode == "P" and "transparency" in img.info
-                                    ):
-                                        background_img = Image.new("RGB", img.size, (255, 255, 255))
-                                        background_img.paste(
-                                            img.convert("RGBA"),
-                                            mask=img.convert("RGBA").split()[3],
-                                        )
-                                        img = background_img
-                                    elif img.mode != "RGB":
-                                        img = img.convert("RGB")
-
-                                    if hasattr(Image, "Resampling"):
-                                        img.thumbnail(max_dim, Image.Resampling.LANCZOS)
-                                    else:
-                                        img.thumbnail(max_dim, Image.LANCZOS)
-
-                                    img_io = io.BytesIO()
-                                    img.save(img_io, format="JPEG", quality=quality, optimize=True)
-                                    zout.writestr(member_name, img_io.getvalue())
-                                except Exception as img_err:
-                                    logger.debug(
-                                        "Skipping image %s: %s", member_name, img_err
-                                    )
-                                    zout.writestr(member_name, buffer)
-                            else:
-                                zout.writestr(member_name, buffer)
-
-                processed.append((name, out_zip))
+            if len(processed) == 1:
+                name, out_path, stats = processed[0]
+                schedule_cleanup(background, out_path)
+                resp = file_response(
+                    out_path,
+                    filename=f"compressed_{name}",
+                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    if name.lower().endswith(".docx")
+                    else "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    background=background,
+                )
+                resp.headers["X-Original-Bytes"] = str(stats["original_bytes"])
+                resp.headers["X-Compressed-Bytes"] = str(stats["compressed_bytes"])
+                resp.headers["X-Saved-Percent"] = str(stats["saved_percent"])
+                resp.headers["X-Images-Touched"] = str(stats["images_touched"])
+                return resp
 
             zip_path = make_temp_path(".zip", settings)
-            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-                for orig_name, out_path in processed:
+            with zipfile.ZipFile(
+                zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+            ) as zipf:
+                for orig_name, out_path, _stats in processed:
                     zipf.write(out_path, arcname=f"compressed_{orig_name}")
 
-            schedule_cleanup(background, *[p for _, p in processed])
-            return file_response(
+            total_before = sum(s["original_bytes"] for _, _, s in processed)
+            total_after = sum(s["compressed_bytes"] for _, _, s in processed)
+            schedule_cleanup(background, *[p for _, p, _ in processed])
+            resp = file_response(
                 zip_path,
                 filename="Compressed_Office_Batch.zip",
                 media_type="application/zip",
                 background=background,
             )
+            resp.headers["X-Original-Bytes"] = str(total_before)
+            resp.headers["X-Compressed-Bytes"] = str(total_after)
+            if total_before:
+                resp.headers["X-Saved-Percent"] = str(
+                    round((1 - total_after / total_before) * 100, 1)
+                )
+            return resp
         except HTTPException:
-            for _, path in processed:
+            for _, path, _ in processed:
                 safe_unlink(path)
             raise
         except Exception as exc:
-            for _, path in processed:
+            for _, path, _ in processed:
                 safe_unlink(path)
             logger.exception("office compress failed")
             raise HTTPException(

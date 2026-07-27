@@ -135,7 +135,14 @@ def write_page_subset(
     return written
 
 
-def pdf_to_docx_fast(input_path: str | Path, output_path: str | Path, indices: list[int]) -> int:
+def pdf_to_docx_fast(
+    input_path: str | Path,
+    output_path: str | Path,
+    indices: list[int],
+    *,
+    on_progress: Callable[[int, int], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+) -> int:
     """
     Fast text extraction into a Word file via PyMuPDF + python-docx.
     Processes pages in order; suitable for full multi-thousand-page documents.
@@ -165,7 +172,10 @@ def pdf_to_docx_fast(input_path: str | Path, output_path: str | Path, indices: l
         style.font.size = Pt(11)
 
         written = 0
-        for idx in indices:
+        total = len(indices)
+        for n, idx in enumerate(indices, start=1):
+            if should_cancel and should_cancel():
+                raise RuntimeError("cancelled")
             if idx < 0 or idx >= src.page_count:
                 continue
             page = src[idx]
@@ -186,9 +196,13 @@ def pdf_to_docx_fast(input_path: str | Path, output_path: str | Path, indices: l
             else:
                 doc.add_paragraph(f"[Page {idx + 1}: no extractable text]")
             written += 1
+            if on_progress and (n == 1 or n == total or n % 5 == 0):
+                on_progress(n, total)
 
         if written == 0:
             raise HTTPException(status_code=400, detail="No pages converted.")
+        if on_progress:
+            on_progress(total, total)
         doc.save(str(output_path))
         return written
     finally:
@@ -235,6 +249,8 @@ def convert_word_layout_chunked(
     converter_cls,
     make_temp: Callable[[str], str],
     cleanup: list[str],
+    on_progress: Callable[[int, int], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> tuple[int, int]:
     """
     Convert layout-preserving Word in page chunks, then merge into one .docx.
@@ -245,8 +261,12 @@ def convert_word_layout_chunked(
 
     chunks = chunked(indices, max(1, chunk_size))
     part_paths: list[str] = []
+    pages_done = 0
+    total_pages = len(indices)
 
     for n, chunk in enumerate(chunks, start=1):
+        if should_cancel and should_cancel():
+            raise RuntimeError("cancelled")
         subset = make_temp(".pdf")
         part_docx = make_temp(".docx")
         cleanup.extend([subset, part_docx])
@@ -265,7 +285,12 @@ def convert_word_layout_chunked(
         finally:
             cv.close()
         part_paths.append(part_docx)
+        pages_done += len(chunk)
+        if on_progress:
+            on_progress(pages_done, total_pages)
 
+    if should_cancel and should_cancel():
+        raise RuntimeError("cancelled")
     merge_docx_files(part_paths, output_path)
     return len(indices), len(chunks)
 
@@ -357,6 +382,8 @@ def extract_tables_chunked(
     pd_module,
     camelot_module=None,
     enable_camelot: bool = False,
+    on_progress: Callable[[int, int], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> list:
     """
     Extract tables in page chunks and concatenate results.
@@ -364,7 +391,11 @@ def extract_tables_chunked(
     """
     all_frames: list = []
     chunks = chunked(indices, max(1, chunk_size))
+    pages_done = 0
+    total_pages = len(indices)
     for n, chunk in enumerate(chunks, start=1):
+        if should_cancel and should_cancel():
+            raise RuntimeError("cancelled")
         logger.info(
             "excel chunk %s/%s pages %s-%s",
             n,
@@ -383,4 +414,7 @@ def extract_tables_chunked(
                 input_path, chunk, camelot_module=camelot_module
             )
         all_frames.extend(frames)
+        pages_done += len(chunk)
+        if on_progress:
+            on_progress(pages_done, total_pages)
     return all_frames

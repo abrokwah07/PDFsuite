@@ -70,7 +70,11 @@
                 <span id="progress-phase">Starting…</span>
                 <span id="progress-elapsed">0s</span>
             </div>
-            <p class="mt-4 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">Large PDFs are processed in batches on your machine. The bar moves during upload, then shows processing until the file is ready.</p>
+            <p id="progress-detail" class="mt-2 text-xs text-slate-500 dark:text-slate-400 font-mono truncate"></p>
+            <div class="mt-4 flex items-center justify-between gap-3">
+                <p class="text-[11px] leading-relaxed text-slate-400 dark:text-slate-500 flex-1">Processed on your machine. You can cancel long jobs.</p>
+                <button type="button" id="progress-cancel-btn" class="shrink-0 text-sm font-semibold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -370,12 +374,14 @@
             </div>
 
             <div id="tool-compress-office" class="tool-section hidden h-full flex flex-col">
+                <!-- compress office -->
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Compress Office</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Reduce the file size of Word and PowerPoint documents by optimizing embedded images.</p>
                 <div class="mb-6 flex-grow">
                     <input type="file" id="compress-office-input" multiple accept=".docx,.pptx" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-rose-50 dark:file:bg-rose-900/20 file:text-rose-700 dark:file:text-rose-400 hover:file:bg-rose-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                     
                     <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Compression Level</label>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Re-encodes embedded images (resize + JPEG) and max-compresses the package. Best savings on photo-heavy files.</p>
                     <select id="compress-office-level" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-rose-500">
                         <option value="low">Low (Preserve High Quality Images)</option>
                         <option value="medium" selected>Medium (Recommended for Emailing)</option>
@@ -907,7 +913,9 @@
             let tickTimer = null;
             let startedAt = 0;
             let displayPct = 0;
-            let mode = 'idle'; // idle | upload | process | done
+            let mode = 'idle'; // idle | upload | process | done | job
+            let activeJobId = null;
+            let onCancel = null;
 
             const el = {
                 overlay: () => document.getElementById('progress-overlay'),
@@ -917,6 +925,8 @@
                 subtitle: () => document.getElementById('progress-subtitle'),
                 phase: () => document.getElementById('progress-phase'),
                 elapsed: () => document.getElementById('progress-elapsed'),
+                detail: () => document.getElementById('progress-detail'),
+                cancelBtn: () => document.getElementById('progress-cancel-btn'),
             };
 
             function formatElapsed(ms) {
@@ -942,14 +952,18 @@
                 }
             }
 
-            function show({ title, subtitle, phase }) {
+            function show({ title, subtitle, phase, jobId = null, cancellable = true }) {
                 startedAt = Date.now();
-                mode = 'upload';
+                mode = jobId ? 'job' : 'upload';
+                activeJobId = jobId;
                 el.overlay().classList.remove('hidden');
                 el.overlay().classList.add('flex');
                 el.title().textContent = title || 'Working…';
                 el.subtitle().textContent = subtitle || 'Please wait';
                 el.phase().textContent = phase || 'Starting…';
+                el.detail().textContent = '';
+                el.cancelBtn().classList.toggle('hidden', !cancellable);
+                el.cancelBtn().disabled = false;
                 setBar(0, false);
 
                 clearInterval(elapsedTimer);
@@ -958,28 +972,17 @@
                 }, 250);
 
                 clearInterval(tickTimer);
-                // While server processes (after upload), ease the bar toward 90%
+                // Fallback crawl only when not receiving real job progress
                 tickTimer = setInterval(() => {
                     if (mode !== 'process') return;
-                    // Asymptotic crawl so long jobs still look alive
                     const next = displayPct + Math.max(0.15, (92 - displayPct) * 0.012);
                     setBar(Math.min(92, next), false);
-                    const phases = [
-                        'Processing on server…',
-                        'Working through pages…',
-                        'Converting in batches…',
-                        'Merging results…',
-                        'Still working — large files take time…',
-                    ];
-                    const idx = Math.min(phases.length - 1, Math.floor((Date.now() - startedAt) / 12000));
-                    if (displayPct > 35) el.phase().textContent = phases[idx];
                 }, 400);
             }
 
             function setUploadProgress(loaded, total) {
                 mode = 'upload';
                 if (total > 0) {
-                    // Upload is 0–28% of the overall bar
                     const uploadPct = (loaded / total) * 28;
                     setBar(uploadPct, false);
                     el.phase().textContent = `Uploading… ${Math.round((loaded / total) * 100)}%`;
@@ -996,16 +999,30 @@
                 if (phaseText) el.phase().textContent = phaseText;
             }
 
+            function setJobProgress(job) {
+                mode = 'job';
+                clearInterval(tickTimer);
+                const pct = typeof job.progress === 'number' ? job.progress : 0;
+                setBar(pct, false);
+                el.phase().textContent = job.phase || job.status || 'Working…';
+                if (job.message) el.detail().textContent = job.message;
+                else if (job.total > 0) el.detail().textContent = `${job.current || 0} / ${job.total} pages`;
+                else el.detail().textContent = '';
+            }
+
             function finish(success) {
                 mode = 'done';
                 clearInterval(tickTimer);
-                setBar(100, false);
+                setBar(success ? 100 : displayPct, false);
                 el.phase().textContent = success ? 'Done — downloading…' : 'Stopped';
+                el.cancelBtn().disabled = true;
                 setTimeout(hide, success ? 450 : 200);
             }
 
             function hide() {
                 mode = 'idle';
+                activeJobId = null;
+                onCancel = null;
                 clearInterval(elapsedTimer);
                 clearInterval(tickTimer);
                 el.overlay().classList.add('hidden');
@@ -1013,7 +1030,21 @@
                 setBar(0, false);
             }
 
-            return { show, setUploadProgress, setProcessing, finish, hide };
+            el.cancelBtn().addEventListener('click', async () => {
+                el.cancelBtn().disabled = true;
+                el.phase().textContent = 'Cancelling…';
+                if (typeof onCancel === 'function') {
+                    try { await onCancel(activeJobId); } catch (_) { /* ignore */ }
+                } else if (activeJobId) {
+                    try {
+                        await fetch(`/api/jobs/${activeJobId}/cancel`, { method: 'POST' });
+                    } catch (_) { /* ignore */ }
+                }
+            });
+
+            function setCancelHandler(fn) { onCancel = fn; }
+
+            return { show, setUploadProgress, setProcessing, setJobProgress, setCancelHandler, finish, hide };
         })();
 
         /**
@@ -1078,7 +1109,134 @@
             }
         }
 
-        // --- GENERIC PROCESSING ENGINE ---
+        function triggerDownload(blob, filename) {
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(downloadUrl);
+            a.remove();
+        }
+
+        function sleep(ms) {
+            return new Promise((r) => setTimeout(r, ms));
+        }
+
+        /**
+         * Background job flow: upload → poll /api/jobs/{id} → download.
+         * Real page progress + cancel.
+         */
+        async function processJob(createUrl, formData, btnElement, defaultText, processingText, fileName) {
+            if (!currentUploadedFiles.length) {
+                showToast("Please choose a file first.", "error");
+                return;
+            }
+            const originalContainer = btnElement.parentElement;
+            btnElement.textContent = processingText;
+            btnElement.disabled = true;
+            originalContainer.classList.add('processing');
+
+            const fileLabel = fileName || currentUploadedFiles[0].name || 'document';
+            ProgressUI.show({
+                title: defaultText,
+                subtitle: fileLabel,
+                phase: 'Uploading…',
+                cancellable: true,
+            });
+
+            let jobId = null;
+            let cancelledByUser = false;
+            ProgressUI.setCancelHandler(async (id) => {
+                cancelledByUser = true;
+                const jid = id || jobId;
+                if (jid) {
+                    await fetch(`/api/jobs/${jid}/cancel`, { method: 'POST' });
+                }
+            });
+
+            try {
+                const createRes = await xhrPost(createUrl, formData, {
+                    timeoutMs: 10 * 60 * 1000,
+                    onUploadProgress: (loaded, total) => ProgressUI.setUploadProgress(loaded, total),
+                });
+                if (!createRes.ok) {
+                    const detail = await readErrorDetailFromBlob(createRes.blob, createRes.status);
+                    ProgressUI.finish(false);
+                    showToast(detail, "error");
+                    btnElement.disabled = false;
+                    return;
+                }
+                const created = JSON.parse(await createRes.blob.text());
+                jobId = created.job_id || created.id;
+                if (!jobId) throw new Error('No job id returned');
+
+                ProgressUI.setJobProgress({
+                    progress: created.progress || 5,
+                    phase: created.phase || 'queued',
+                    message: created.message || 'Queued…',
+                    current: created.current || 0,
+                    total: created.total || 0,
+                });
+
+                // Poll until terminal state
+                let job = created;
+                while (true) {
+                    if (cancelledByUser) break;
+                    await sleep(400);
+                    const st = await fetch(`/api/jobs/${jobId}`);
+                    if (!st.ok) throw new Error('Lost job status');
+                    job = await st.json();
+                    ProgressUI.setJobProgress(job);
+                    if (['completed', 'failed', 'cancelled'].includes(job.status)) break;
+                }
+
+                if (job.status === 'cancelled' || cancelledByUser) {
+                    ProgressUI.finish(false);
+                    showToast('Job cancelled.', 'error');
+                    btnElement.disabled = false;
+                    return;
+                }
+                if (job.status === 'failed') {
+                    ProgressUI.finish(false);
+                    showToast(job.error || job.message || 'Conversion failed', 'error');
+                    btnElement.disabled = false;
+                    return;
+                }
+
+                ProgressUI.setJobProgress({ ...job, progress: 98, phase: 'downloading', message: 'Downloading result…' });
+                const dl = await fetch(`/api/jobs/${jobId}/download`);
+                if (!dl.ok) {
+                    const detail = await readErrorDetail(dl);
+                    ProgressUI.finish(false);
+                    showToast(detail, 'error');
+                    btnElement.disabled = false;
+                    return;
+                }
+                const blob = await dl.blob();
+                const disposition = dl.headers.get('Content-Disposition') || '';
+                const serverName = (disposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i) || [])[1];
+                const outName = serverName
+                    ? decodeURIComponent(serverName.replace(/"/g, ''))
+                    : (job.result_name || fileLabel);
+                triggerDownload(blob, outName);
+                ProgressUI.finish(true);
+                const label = (job.meta && job.meta.pages_label) || job.message || '';
+                showToast(label ? `${defaultText} done (${label})` : `${defaultText} completed.`, 'success');
+                resetPreview();
+            } catch (error) {
+                ProgressUI.finish(false);
+                showToast(error.message || 'Connection error.', 'error');
+                btnElement.disabled = false;
+            } finally {
+                btnElement.textContent = defaultText;
+                originalContainer.classList.remove('processing');
+            }
+        }
+
+        // --- GENERIC PROCESSING ENGINE (sync endpoints) ---
         async function processFile(url, formData, btnElement, defaultText, processingText, fileNamePrefix, fileName) {
             if (!currentUploadedFiles.length && !formData.has('file') && !formData.has('files')) {
                 showToast("Please choose a file first.", "error");
@@ -1093,6 +1251,7 @@
                 title: defaultText,
                 subtitle: fileLabel,
                 phase: 'Preparing upload…',
+                cancellable: false,
             });
 
             try {
@@ -1106,37 +1265,33 @@
                     },
                 });
 
-                // Upload finished — ensure we are in processing phase until response handled
                 ProgressUI.setProcessing(processingText || 'Processing on server…');
 
                 if (response.ok) {
                     ProgressUI.setProcessing('Preparing download…');
                     const blob = response.blob;
-                    const downloadUrl = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none'; a.href = downloadUrl;
-                    
                     const contentType = (response.headers.get('Content-Type') || '').split(';')[0].trim();
                     const disposition = response.headers.get('Content-Disposition') || '';
                     const serverName = (disposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i) || [])[1];
-                    if (contentType === 'application/zip') a.download = `${fileNamePrefix}_batch.zip`;
-                    else if (serverName) a.download = decodeURIComponent(serverName.replace(/"/g, ''));
-                    else a.download = `${fileNamePrefix}_${fileName}`;
-                    
-                    document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(downloadUrl);
-                    a.remove();
+                    let outName;
+                    if (contentType === 'application/zip') outName = `${fileNamePrefix}_batch.zip`;
+                    else if (serverName) outName = decodeURIComponent(serverName.replace(/"/g, ''));
+                    else outName = `${fileNamePrefix}_${fileName}`;
+                    triggerDownload(blob, outName);
+
                     const pagesLabel = response.headers.get('X-Pages-Label');
                     const engine = response.headers.get('X-Convert-Engine');
+                    const saved = response.headers.get('X-Saved-Percent');
                     let msg = `${defaultText} completed.`;
                     if (pagesLabel) msg = `${defaultText} done (${pagesLabel}${engine ? ', ' + engine : ''}).`;
+                    if (saved != null && saved !== '') msg = `${defaultText} completed — saved ${saved}%.`;
                     ProgressUI.finish(true);
                     showToast(msg, "success");
-                    resetPreview(); // clear after successful convert
+                    resetPreview();
                 } else {
                     const detail = await readErrorDetailFromBlob(response.blob, response.status);
                     ProgressUI.finish(false);
                     showToast(detail, "error");
-                    // Keep file selected so user can retry
                     btnElement.disabled = false;
                 }
             } catch (error) {
@@ -1158,7 +1313,14 @@
             const formData = new FormData();
             currentUploadedFiles.forEach(f => formData.append('files', f));
             formData.append('pages', (document.getElementById('to-excel-pages').value || '').trim());
-            processFile('/api/convert/to-excel', formData, document.getElementById('to-excel-btn'), 'Convert to Excel', 'Batch extracting & merging...', 'tables', currentUploadedFiles[0].name.replace('.pdf','.xlsx'));
+            processJob(
+                '/api/jobs/convert/to-excel',
+                formData,
+                document.getElementById('to-excel-btn'),
+                'Convert to Excel',
+                'Extracting tables…',
+                currentUploadedFiles[0].name.replace(/\.pdf$/i, '.xlsx')
+            );
         });
 
         document.getElementById('manipulate-btn').addEventListener('click', () => {
@@ -1187,11 +1349,14 @@
             formData.append('file', currentUploadedFiles[0]);
             formData.append('pages', (document.getElementById('to-word-pages').value || '').trim());
             formData.append('mode', document.getElementById('to-word-mode').value || 'auto');
-            const mode = document.getElementById('to-word-mode').value;
-            const busy = mode === 'layout'
-                ? 'Chunking, converting & merging (layout)...'
-                : 'Converting full document (auto batches)...';
-            processFile('/api/convert/to-word', formData, document.getElementById('to-word-btn'), 'Convert to Word', busy, 'word', currentUploadedFiles[0].name.replace('.pdf','.docx'));
+            processJob(
+                '/api/jobs/convert/to-word',
+                formData,
+                document.getElementById('to-word-btn'),
+                'Convert to Word',
+                'Converting…',
+                currentUploadedFiles[0].name.replace(/\.pdf$/i, '.docx')
+            );
         });
         
         document.getElementById('to-pdf-btn').addEventListener('click', () => {

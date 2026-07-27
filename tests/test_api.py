@@ -296,23 +296,67 @@ def test_edit_inspect_and_replace(client: TestClient):
 
 
 def test_compress_office_docx(client: TestClient):
-    # Minimal valid OOXML package
+    # OOXML package with a large embedded PNG so compression has something to do
+    from PIL import Image
+
+    img_buf = io.BytesIO()
+    Image.new("RGB", (800, 600), color=(30, 120, 200)).save(img_buf, format="PNG")
+    png = img_buf.getvalue()
+
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_STORED) as zf:
         zf.writestr(
             "[Content_Types].xml",
-            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>',
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="png" ContentType="image/png"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            "</Types>",
         )
         zf.writestr("word/document.xml", "<w:document></w:document>")
+        zf.writestr("word/media/image1.png", png)
     docx = buf.getvalue()
 
     res = client.post(
         "/api/compress-office",
         files=[("files", ("sample.docx", docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))],
-        data={"level": "medium"},
+        data={"level": "high"},
     )
     assert res.status_code == 200, res.text
-    assert res.headers["content-type"].startswith("application/zip")
+    # Single file returns compressed docx, not always a zip batch
+    assert len(res.content) < len(docx)
+    assert "X-Saved-Percent" in res.headers or len(res.content) <= len(docx)
+
+
+def test_background_word_job(client: TestClient):
+    pdf = _make_pdf_bytes("Job convert me")
+    create = client.post(
+        "/api/jobs/convert/to-word",
+        files={"file": ("doc.pdf", pdf, "application/pdf")},
+        data={"pages": "", "mode": "fast"},
+    )
+    assert create.status_code == 200, create.text
+    body = create.json()
+    job_id = body["job_id"]
+    assert job_id
+
+    # Poll until done
+    import time
+
+    job = body
+    for _ in range(50):
+        st = client.get(f"/api/jobs/{job_id}")
+        assert st.status_code == 200
+        job = st.json()
+        if job["status"] in ("completed", "failed", "cancelled"):
+            break
+        time.sleep(0.05)
+    assert job["status"] == "completed", job
+    assert job["progress"] >= 100 or job["downloadable"]
+
+    dl = client.get(f"/api/jobs/{job_id}/download")
+    assert dl.status_code == 200, dl.text
+    assert len(dl.content) > 500
 
 
 def test_reject_oversized_payload():
