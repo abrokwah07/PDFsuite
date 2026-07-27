@@ -108,27 +108,18 @@
         </div>
 
         <div class="flex-grow overflow-y-auto py-4 px-3 space-y-1" id="nav-menu">
-            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3 mt-2 nav-section-label">Conversion</div>
-            <button onclick="switchTool('excel')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400 active-tool" data-target="tool-excel">
-                <div class="text-emerald-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></div><span>PDF to Excel</span>
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3 mt-2 nav-section-label">Convert</div>
+            <button onclick="switchTool('pdf-export')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400 active-tool" data-target="tool-pdf-export">
+                <div class="text-emerald-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg></div><span>PDF → Office</span>
             </button>
-            <button onclick="switchTool('word')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-word">
-                <div class="text-teal-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></div><span>PDF to Word</span>
-            </button>
-            <button onclick="switchTool('pptx')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-pptx">
-                <div class="text-orange-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 8h6M9 12h6M9 16h4"></path></svg></div><span>PDF to PowerPoint</span>
-            </button>
-            <button onclick="switchTool('office')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-office">
-                <div class="text-indigo-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div><span>Office to PDF</span>
-            </button>
-            <button onclick="switchTool('office-format')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-office-format">
-                <div class="text-violet-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg></div><span>Office ↔ Office</span>
+            <button onclick="switchTool('office-convert')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-office-convert">
+                <div class="text-indigo-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg></div><span>Office convert</span>
             </button>
             <button onclick="switchTool('compress-office')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-compress-office">
                 <div class="text-rose-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg></div>
-                <span>Compress Office</span>
+                <span>Shrink Office files</span>
             </button>
-            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3 pt-4 nav-section-label">Organization</div>
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3 pt-4 nav-section-label">PDF tools</div>
             <button onclick="switchTool('manipulate')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-manipulate">
                 <div class="text-pink-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></div><span>Organize & Rotate</span>
             </button>
@@ -141,7 +132,7 @@
             <button onclick="switchTool('compress')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-compress">
                 <div class="text-green-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></div><span>Compress PDF</span>
             </button>
-            <div class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4 nav-section-label">Security & Edits</div>
+            <div class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4 nav-section-label">Security & edit</div>
             <button onclick="switchTool('stamp')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-stamp">
                 <div class="text-sky-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></div>
                 <span>Edit PDF</span>
@@ -181,85 +172,58 @@
     <section class="w-96 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 shadow-xl overflow-y-auto overflow-x-hidden">
         <div class="p-8 h-full flex flex-col" id="tools-container">
 
-            <div id="tool-excel" class="tool-section block h-full flex flex-col">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF to Excel</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Extract tables automatically. Large PDFs are scanned in batches and merged into <strong>one Excel file</strong>.</p>
+            <!-- Unified: PDF → Word / Excel / PowerPoint -->
+            <div id="tool-pdf-export" class="tool-section block h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF → Office</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Export a PDF to <strong>Word</strong>, <strong>Excel</strong>, or <strong>PowerPoint</strong>. One place — pick the format.</p>
                 <div class="mb-6 flex-grow space-y-3">
-                    <input type="file" id="to-excel-input" multiple accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
+                    <input type="file" id="pdf-export-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                     <div>
-                        <label for="to-excel-pages" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Page range (optional)</label>
-                        <input type="text" id="to-excel-pages" placeholder="Leave empty = whole PDF · or e.g. 1-200" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
-                        <p id="to-excel-hint" class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Empty range converts the full document in auto-batches, then merges results.</p>
-                    </div>
-                </div>
-                <button id="to-excel-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to Excel</button>
-            </div>
-
-            <div id="tool-word" class="tool-section hidden h-full flex flex-col">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF to Word</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Convert to editable Word. Huge PDFs are processed in batches and merged into <strong>one .docx</strong>.</p>
-                <div class="mb-6 flex-grow space-y-3">
-                    <input type="file" id="to-word-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 dark:file:bg-teal-900/20 file:text-teal-700 dark:file:text-teal-400 hover:file:bg-teal-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
-                    <div>
-                        <label for="to-word-pages" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Page range (optional)</label>
-                        <input type="text" id="to-word-pages" placeholder="Leave empty = whole PDF · or e.g. 1-500" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500">
-                    </div>
-                    <div>
-                        <label for="to-word-mode" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Conversion mode</label>
-                        <select id="to-word-mode" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500">
-                            <option value="auto" selected>Auto (recommended)</option>
-                            <option value="fast">Fast text (best for long PDFs)</option>
-                            <option value="layout">Layout accurate (slower, auto-chunked)</option>
+                        <label for="pdf-export-format" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Output format</label>
+                        <select id="pdf-export-format" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
+                            <option value="word">Word (.docx)</option>
+                            <option value="excel">Excel (.xlsx) — tables</option>
+                            <option value="pptx">PowerPoint (.pptx) — page as slides</option>
                         </select>
-                        <p id="to-word-hint" class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Leave page range empty to convert everything. Long jobs may take several minutes — one file downloads when done.</p>
                     </div>
-                </div>
-                <button id="to-word-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-teal-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to Word</button>
-            </div>
-
-            <div id="tool-pptx" class="tool-section hidden h-full flex flex-col">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF to PowerPoint</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Each PDF page becomes a full-bleed slide (visual fidelity). Large decks run as a background job with progress.</p>
-                <div class="mb-6 flex-grow space-y-3">
-                    <input type="file" id="to-pptx-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 dark:file:bg-orange-900/20 file:text-orange-700 dark:file:text-orange-400 hover:file:bg-orange-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                     <div>
-                        <label for="to-pptx-pages" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Page range (optional)</label>
-                        <input type="text" id="to-pptx-pages" placeholder="Leave empty = whole PDF (max 500 pages) · or e.g. 1-40" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-orange-500">
-                        <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Image slides are memory-heavy — use a range for very long PDFs.</p>
+                        <label for="pdf-export-pages" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Page range (optional)</label>
+                        <input type="text" id="pdf-export-pages" placeholder="Empty = whole document · e.g. 1-50" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
                     </div>
+                    <div id="pdf-export-word-opts">
+                        <label for="pdf-export-word-mode" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Word mode</label>
+                        <select id="pdf-export-word-mode" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
+                            <option value="auto" selected>Auto (recommended)</option>
+                            <option value="fast">Fast text (long PDFs)</option>
+                            <option value="layout">Layout accurate (slower)</option>
+                        </select>
+                    </div>
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">Runs as a background job with progress. PowerPoint max ~500 pages (use a range for longer PDFs).</p>
                 </div>
-                <button id="to-pptx-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-orange-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to PowerPoint</button>
+                <button id="pdf-export-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert</button>
             </div>
 
-            <div id="tool-office" class="tool-section hidden h-full flex flex-col">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Office to PDF</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Convert Word, Excel, or PowerPoint files into PDF documents.</p>
-                <div class="mb-6 flex-grow">
-                    <input type="file" id="to-pdf-input" accept=".docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.odp,.ods" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/20 file:text-indigo-700 dark:file:text-indigo-400 hover:file:bg-indigo-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
-                </div>
-                <button id="to-pdf-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-indigo-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert to PDF</button>
-            </div>
-
-            <div id="tool-office-format" class="tool-section hidden h-full flex flex-col">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Office ↔ Office</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Convert between Word, PowerPoint, Excel, and PDF via LibreOffice (e.g. <strong>PPTX → Word</strong>, <strong>Word → PPTX</strong>, <strong>PPTX → PDF</strong>).</p>
+            <!-- Unified: Office → PDF / Word / PPTX / Excel -->
+            <div id="tool-office-convert" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Office convert</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Word, Excel, PowerPoint, and OpenDocument — convert to PDF or another Office format (LibreOffice).</p>
                 <div class="mb-6 flex-grow space-y-3">
-                    <input type="file" id="office-format-input" accept=".docx,.doc,.pptx,.ppt,.xlsx,.xls,.odt,.odp,.ods" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-50 dark:file:bg-violet-900/20 file:text-violet-700 dark:file:text-violet-400 hover:file:bg-violet-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
+                    <input type="file" id="office-convert-input" accept=".docx,.doc,.pptx,.ppt,.xlsx,.xls,.odt,.odp,.ods" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/20 file:text-indigo-700 dark:file:text-indigo-400 hover:file:bg-indigo-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
                     <div>
-                        <label for="office-format-target" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Convert to</label>
-                        <select id="office-format-target" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-violet-500">
-                            <option value="pdf">PDF</option>
-                            <option value="pptx" selected>PowerPoint (.pptx)</option>
+                        <label for="office-convert-target" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Convert to</label>
+                        <select id="office-convert-target" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-indigo-500">
+                            <option value="pdf" selected>PDF</option>
                             <option value="docx">Word (.docx)</option>
+                            <option value="pptx">PowerPoint (.pptx)</option>
                             <option value="xlsx">Excel (.xlsx)</option>
-                            <option value="odp">OpenDocument Presentation</option>
                             <option value="odt">OpenDocument Text</option>
+                            <option value="odp">OpenDocument Presentation</option>
                             <option value="ods">OpenDocument Spreadsheet</option>
                         </select>
-                        <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Requires LibreOffice (included in Docker). Layout may change slightly between apps.</p>
+                        <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Examples: PPTX → PDF, PPTX → Word, Word → PPTX. Layout can shift slightly between apps.</p>
                     </div>
                 </div>
-                <button id="office-format-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-violet-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert format</button>
+                <button id="office-convert-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-indigo-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert</button>
             </div>
 
             <div id="tool-manipulate" class="tool-section hidden h-full flex flex-col">
@@ -416,9 +380,8 @@
             </div>
 
             <div id="tool-compress-office" class="tool-section hidden h-full flex flex-col">
-                <!-- compress office -->
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Compress Office</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Reduce the file size of Word and PowerPoint documents by optimizing embedded images.</p>
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Shrink Office files</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Shrink <strong>.docx / .pptx</strong> by re-encoding embedded images (not the same as Compress PDF).</p>
                 <div class="mb-6 flex-grow">
                     <input type="file" id="compress-office-input" multiple accept=".docx,.pptx" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-rose-50 dark:file:bg-rose-900/20 file:text-rose-700 dark:file:text-rose-400 hover:file:bg-rose-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                     
@@ -477,7 +440,7 @@
     </section>
 
     <script>
-        let currentActiveTool = 'excel';
+        let currentActiveTool = 'pdf-export';
         let currentUploadedFiles = [];
         let currentPageStart = 0;
         let loadedPreviewImages = [];
@@ -1351,17 +1314,61 @@
         }
 
         // --- BUTTON EVENT LISTENERS ---
-        document.getElementById('to-excel-btn').addEventListener('click', () => {
+        const pdfExportFormat = document.getElementById('pdf-export-format');
+        const pdfExportWordOpts = document.getElementById('pdf-export-word-opts');
+        function syncPdfExportOpts() {
+            if (!pdfExportFormat || !pdfExportWordOpts) return;
+            pdfExportWordOpts.classList.toggle('hidden', pdfExportFormat.value !== 'word');
+        }
+        if (pdfExportFormat) {
+            pdfExportFormat.addEventListener('change', syncPdfExportOpts);
+            syncPdfExportOpts();
+        }
+
+        document.getElementById('pdf-export-btn').addEventListener('click', () => {
+            if (!currentUploadedFiles.length) {
+                showToast('Please choose a PDF first.', 'error');
+                return;
+            }
+            const fmt = (document.getElementById('pdf-export-format').value || 'word');
+            const pages = (document.getElementById('pdf-export-pages').value || '').trim();
             const formData = new FormData();
-            currentUploadedFiles.forEach(f => formData.append('files', f));
-            formData.append('pages', (document.getElementById('to-excel-pages').value || '').trim());
+            const base = currentUploadedFiles[0].name.replace(/\.pdf$/i, '');
+            const btn = document.getElementById('pdf-export-btn');
+
+            if (fmt === 'excel') {
+                currentUploadedFiles.forEach((f) => formData.append('files', f));
+                formData.append('pages', pages);
+                processJob('/api/jobs/convert/to-excel', formData, btn, 'PDF → Excel', 'Extracting tables…', `${base}.xlsx`);
+            } else if (fmt === 'pptx') {
+                formData.append('file', currentUploadedFiles[0]);
+                formData.append('pages', pages);
+                processJob('/api/jobs/convert/to-pptx', formData, btn, 'PDF → PowerPoint', 'Building slides…', `${base}.pptx`);
+            } else {
+                formData.append('file', currentUploadedFiles[0]);
+                formData.append('pages', pages);
+                formData.append('mode', document.getElementById('pdf-export-word-mode').value || 'auto');
+                processJob('/api/jobs/convert/to-word', formData, btn, 'PDF → Word', 'Converting…', `${base}.docx`);
+            }
+        });
+
+        document.getElementById('office-convert-btn').addEventListener('click', () => {
+            if (!currentUploadedFiles.length) {
+                showToast('Please choose a file first.', 'error');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', currentUploadedFiles[0]);
+            const target = document.getElementById('office-convert-target').value || 'pdf';
+            formData.append('target', target);
+            const base = currentUploadedFiles[0].name.replace(/\.[^.]+$/, '');
             processJob(
-                '/api/jobs/convert/to-excel',
+                '/api/jobs/convert/office',
                 formData,
-                document.getElementById('to-excel-btn'),
-                'Convert to Excel',
-                'Extracting tables…',
-                currentUploadedFiles[0].name.replace(/\.pdf$/i, '.xlsx')
+                document.getElementById('office-convert-btn'),
+                'Office convert',
+                `Converting to ${target.toUpperCase()}…`,
+                `${base}.${target}`
             );
         });
 
@@ -1385,58 +1392,7 @@
             formData.append('level', document.getElementById('compress-level').value); 
             processFile('/api/compress', formData, document.getElementById('compress-btn'), 'Compress File', 'Compressing...', 'compressed', currentUploadedFiles[0].name);
         });
-        
-        document.getElementById('to-word-btn').addEventListener('click', () => {
-            const formData = new FormData();
-            formData.append('file', currentUploadedFiles[0]);
-            formData.append('pages', (document.getElementById('to-word-pages').value || '').trim());
-            formData.append('mode', document.getElementById('to-word-mode').value || 'auto');
-            processJob(
-                '/api/jobs/convert/to-word',
-                formData,
-                document.getElementById('to-word-btn'),
-                'Convert to Word',
-                'Converting…',
-                currentUploadedFiles[0].name.replace(/\.pdf$/i, '.docx')
-            );
-        });
 
-        document.getElementById('to-pptx-btn').addEventListener('click', () => {
-            const formData = new FormData();
-            formData.append('file', currentUploadedFiles[0]);
-            formData.append('pages', (document.getElementById('to-pptx-pages').value || '').trim());
-            processJob(
-                '/api/jobs/convert/to-pptx',
-                formData,
-                document.getElementById('to-pptx-btn'),
-                'Convert to PowerPoint',
-                'Building slides…',
-                currentUploadedFiles[0].name.replace(/\.pdf$/i, '.pptx')
-            );
-        });
-
-        document.getElementById('office-format-btn').addEventListener('click', () => {
-            const formData = new FormData();
-            formData.append('file', currentUploadedFiles[0]);
-            const target = document.getElementById('office-format-target').value || 'pptx';
-            formData.append('target', target);
-            const base = currentUploadedFiles[0].name.replace(/\.[^.]+$/, '');
-            processJob(
-                '/api/jobs/convert/office',
-                formData,
-                document.getElementById('office-format-btn'),
-                'Office convert',
-                `Converting to ${target.toUpperCase()}…`,
-                `${base}.${target}`
-            );
-        });
-        
-        document.getElementById('to-pdf-btn').addEventListener('click', () => {
-            const formData = new FormData(); formData.append('file', currentUploadedFiles[0]);
-            const newName = currentUploadedFiles[0].name.split('.').slice(0, -1).join('.') + '.pdf';
-            processFile('/api/convert/to-pdf', formData, document.getElementById('to-pdf-btn'), 'Convert to PDF', 'Converting...', 'pdf', newName);
-        });
-        
         document.getElementById('protect-btn').addEventListener('click', () => {
             const formData = new FormData(); formData.append('file', currentUploadedFiles[0]);
             formData.append('open_password', document.getElementById('open-password').value);

@@ -51,7 +51,7 @@ class Settings:
     """Enterprise-oriented defaults for Local PDF Suite."""
 
     app_name: str = "Local PDF Suite"
-    app_version: str = "1.3.1"
+    app_version: str = "1.3.2"
     environment: str = "production"
 
     # Network
@@ -122,7 +122,7 @@ def get_settings() -> Settings:
 
     return Settings(
         app_name=os.getenv("APP_NAME", "Local PDF Suite"),
-        app_version=os.getenv("APP_VERSION", "1.3.1"),
+        app_version=os.getenv("APP_VERSION", "1.3.2"),
         environment=os.getenv("APP_ENV", "production"),
         host=os.getenv("HOST", default_host),
         port=_env_int("PORT", 8000),
