@@ -24,18 +24,150 @@ LO_FILTERS = {
     "ods": "ods:calc8",
 }
 
-# Allowed source → target pairs (excluding PDF→PPTX which uses PyMuPDF path)
+# Allowed source → target pairs (excluding PDF→Office which uses dedicated engines).
+# Word ↔ Excel is via LibreOffice (best when the Word file has tables).
 OFFICE_FORMAT_MAP: dict[str, set[str]] = {
     ".ppt": {"pdf", "pptx", "odp"},
-    ".pptx": {"pdf", "docx", "odp", "pptx"},
-    ".doc": {"pdf", "docx", "odt"},
-    ".docx": {"pdf", "pptx", "odt", "docx"},
-    ".xls": {"pdf", "xlsx", "ods"},
-    ".xlsx": {"pdf", "pptx", "ods", "xlsx"},
-    ".odp": {"pdf", "pptx"},
-    ".odt": {"pdf", "docx", "pptx"},
-    ".ods": {"pdf", "xlsx"},
+    ".pptx": {"pdf", "docx", "xlsx", "odp"},
+    ".doc": {"pdf", "docx", "xlsx", "odt", "pptx"},
+    ".docx": {"pdf", "pptx", "xlsx", "odt"},
+    ".xls": {"pdf", "xlsx", "ods", "docx"},
+    ".xlsx": {"pdf", "pptx", "ods", "docx"},
+    ".odp": {"pdf", "pptx", "docx"},
+    ".odt": {"pdf", "docx", "pptx", "xlsx"},
+    ".ods": {"pdf", "xlsx", "docx"},
 }
+
+SOURCE_LABELS: dict[str, str] = {
+    ".pdf": "PDF",
+    ".doc": "Word (legacy)",
+    ".docx": "Word",
+    ".ppt": "PowerPoint (legacy)",
+    ".pptx": "PowerPoint",
+    ".xls": "Excel (legacy)",
+    ".xlsx": "Excel",
+    ".odt": "OpenDocument Text",
+    ".odp": "OpenDocument Presentation",
+    ".ods": "OpenDocument Spreadsheet",
+}
+
+TARGET_LABELS: dict[str, str] = {
+    "pdf": "PDF",
+    "docx": "Word (.docx)",
+    "pptx": "PowerPoint (.pptx)",
+    "xlsx": "Excel (.xlsx)",
+    "odt": "OpenDocument Text (.odt)",
+    "odp": "OpenDocument Presentation (.odp)",
+    "ods": "OpenDocument Spreadsheet (.ods)",
+    "word": "Word (.docx)",
+    "excel": "Excel (.xlsx) — extract tables",
+    "word_layout": "Word layout mode",
+}
+
+# Extra hints for trickier conversions
+TARGET_HINTS: dict[tuple[str, str], str] = {
+    (".docx", "xlsx"): "Best results when Word contains tables",
+    (".doc", "xlsx"): "Best results when Word contains tables",
+    (".odt", "xlsx"): "Best results when the document contains tables",
+    (".xlsx", "docx"): "Spreadsheet exported as a Word document",
+    (".xls", "docx"): "Spreadsheet exported as a Word document",
+    (".pdf", "excel"): "Extract tables from the PDF into a spreadsheet",
+    (".pdf", "pptx"): "One image slide per PDF page",
+    (".pdf", "word"): "Editable text document",
+}
+
+
+def normalize_ext(name_or_ext: str) -> str:
+    raw = (name_or_ext or "").strip().lower()
+    if not raw:
+        return ""
+    if "/" in raw or "\\" in raw:
+        raw = Path(raw).suffix.lower()
+    if not raw.startswith(".") and "." in raw:
+        raw = Path(raw).suffix.lower()
+    if raw and not raw.startswith("."):
+        raw = f".{raw}"
+    return raw
+
+
+def detect_source(filename: str) -> dict:
+    """
+    Detect source type from filename and list valid conversion targets.
+    Fool-proof routing for the Smart Convert UI.
+    """
+    ext = normalize_ext(filename)
+    if not ext:
+        return {
+            "ok": False,
+            "error": "Could not detect file type. Use a named file with an extension.",
+            "ext": "",
+            "label": "Unknown",
+            "targets": [],
+        }
+
+    if ext == ".pdf":
+        targets = [
+            {
+                "id": "word",
+                "label": "Word (.docx)",
+                "route": "pdf_word",
+                "hint": TARGET_HINTS.get((".pdf", "word"), "Editable text document"),
+            },
+            {
+                "id": "excel",
+                "label": "Excel (.xlsx)",
+                "route": "pdf_excel",
+                "hint": TARGET_HINTS.get((".pdf", "excel"), "Extract tables into a spreadsheet"),
+            },
+            {
+                "id": "pptx",
+                "label": "PowerPoint (.pptx)",
+                "route": "pdf_pptx",
+                "hint": TARGET_HINTS.get((".pdf", "pptx"), "One image slide per PDF page"),
+            },
+        ]
+        return {
+            "ok": True,
+            "ext": ext,
+            "label": SOURCE_LABELS[ext],
+            "family": "pdf",
+            "targets": targets,
+            "supports_pages": True,
+            "supports_word_mode": True,
+        }
+
+    if ext in OFFICE_FORMAT_MAP:
+        targets = []
+        for t in sorted(OFFICE_FORMAT_MAP[ext]):
+            default_hint = f"{SOURCE_LABELS.get(ext, ext)} → {TARGET_LABELS.get(t, t)}"
+            targets.append(
+                {
+                    "id": t,
+                    "label": TARGET_LABELS.get(t, t.upper()),
+                    "route": "office",
+                    "hint": TARGET_HINTS.get((ext, t), default_hint),
+                }
+            )
+        return {
+            "ok": True,
+            "ext": ext,
+            "label": SOURCE_LABELS.get(ext, ext),
+            "family": "office",
+            "targets": targets,
+            "supports_pages": False,
+            "supports_word_mode": False,
+        }
+
+    return {
+        "ok": False,
+        "error": (
+            f"Unsupported type '{ext}'. "
+            "Use PDF, Word, Excel, PowerPoint, or OpenDocument files."
+        ),
+        "ext": ext,
+        "label": "Unsupported",
+        "targets": [],
+    }
 
 
 def pdf_to_pptx(

@@ -328,7 +328,39 @@ def test_compress_office_docx(client: TestClient):
     assert "X-Saved-Percent" in res.headers or len(res.content) <= len(docx)
 
 
+def test_convert_detect_pdf_and_pptx(client: TestClient):
+    pdf = client.get("/api/convert/detect", params={"filename": "report.PDF"})
+    assert pdf.status_code == 200
+    body = pdf.json()
+    assert body["ok"] is True
+    assert body["family"] == "pdf"
+    ids = {t["id"] for t in body["targets"]}
+    assert ids == {"word", "excel", "pptx"}
+    assert body["supports_pages"] is True
+
+    pptx = client.get("/api/convert/detect", params={"filename": "deck.pptx"})
+    assert pptx.status_code == 200
+    pbody = pptx.json()
+    assert pbody["ok"] is True
+    assert pbody["family"] == "office"
+    assert "pdf" in {t["id"] for t in pbody["targets"]}
+    assert "docx" in {t["id"] for t in pbody["targets"]}
+
+    word = client.get("/api/convert/detect", params={"filename": "notes.docx"})
+    assert word.status_code == 200
+    wbody = word.json()
+    assert wbody["ok"] is True
+    wids = {t["id"] for t in wbody["targets"]}
+    assert "xlsx" in wids  # Word → Excel
+    assert "pdf" in wids
+    assert "pptx" in wids
+
+    bad = client.get("/api/convert/detect", params={"filename": "note.txt"})
+    assert bad.status_code == 400
+
+
 def test_pdf_to_pptx_job(client: TestClient):
+
     pdf = _make_pdf_bytes("Slide content")
     create = client.post(
         "/api/jobs/convert/to-pptx",
@@ -526,8 +558,53 @@ def test_to_excel_full_or_range(client: TestClient):
         files=[("files", ("doc.pdf", pdf, "application/pdf"))],
         data={"pages": ""},
     )
-    # May or may not find tables; must not hang / 500
-    assert res.status_code in (200, 400), res.text
+    # Text fallback means readable PDFs should always produce a workbook
+    assert res.status_code == 200, res.text
+    assert "spreadsheetml" in res.headers.get("content-type", "")
+
+
+def test_schedule_row_parser_ocr_tolerant():
+    """Salary-schedule lines with OCR noise must still parse into columns."""
+    from app.conversion import _parse_schedule_rows
+
+    lines = [
+        "EMPLOYEES SALARY SCHEDULE FOR THE MONTH OF JULY, 2026",
+        "1_|KUMAH, GIDEON 9040009444933 STANBIC AIRPORT CITY GHS 2,000.00",
+        "g __|SOVOR PETER 1801010041296 GCB SPINTEX GHS 378.00",
+        "11_|AKWETEY ABEL 1400005512297 CAL BANK OSU GHS 2,058.31,",
+        "TOTAL GHS 34,409.62",
+    ]
+    rows = _parse_schedule_rows(lines)
+    assert rows is not None
+    assert rows[0] == [
+        "S/NO",
+        "NAME OF EMPLOYEE",
+        "ACCOUNT NUMBER",
+        "BANK",
+        "BRANCH",
+        "AMOUNT",
+    ]
+    names = [r[1] for r in rows[1:]]
+    assert "KUMAH, GIDEON" in names
+    assert "SOVOR PETER" in names
+    assert "AKWETEY ABEL" in names
+    assert any(r[1] == "TOTAL" for r in rows)
+
+
+def test_analyze_and_text_fallback(tmp_path):
+    import pandas as pd
+    from app.conversion import analyze_pdf_text, convert_pdf_to_excel
+
+    pdf_path = tmp_path / "plain.pdf"
+    pdf_path.write_bytes(_make_pdf_bytes("Hello conversion quality check"))
+    analysis = analyze_pdf_text(pdf_path, [0])
+    assert analysis["quality"] in {"good", "weak", "empty"}
+    out = tmp_path / "out.xlsx"
+    meta = convert_pdf_to_excel(
+        pdf_path, out, [0], pd_module=pd, enable_ocr=False
+    )
+    assert out.is_file() and out.stat().st_size > 500
+    assert meta["sheets"] >= 1
 
 
 def test_merge_docx(tmp_path):

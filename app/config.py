@@ -51,7 +51,7 @@ class Settings:
     """Enterprise-oriented defaults for Local PDF Suite."""
 
     app_name: str = "Local PDF Suite"
-    app_version: str = "1.3.2"
+    app_version: str = "1.4.0"
     environment: str = "production"
 
     # Network
@@ -65,6 +65,8 @@ class Settings:
     max_preview_pages: int = 30
     max_total_preview_pages: int = 500
     max_ocr_pages: int = 200
+    # Auto-OCR during convert when PDF is scanned / weak text (per job)
+    max_auto_ocr_pages: int = 40
     # Full-document auto conversion: process in chunks, merge to one file
     word_chunk_pages: int = 40  # layout chunks
     excel_chunk_pages: int = 50
@@ -75,6 +77,7 @@ class Settings:
     max_word_pages: int = 8000
     max_excel_pages: int = 3000
     # Layout (pdf2docx) is slow; auto uses fast text above this many pages
+    # Scanned PDFs always prefer fast+OCR regardless of this threshold
     word_layout_page_threshold: int = 40
     max_password_length: int = 128
     max_zip_entries: int = 10_000
@@ -122,7 +125,7 @@ def get_settings() -> Settings:
 
     return Settings(
         app_name=os.getenv("APP_NAME", "Local PDF Suite"),
-        app_version=os.getenv("APP_VERSION", "1.3.2"),
+        app_version=os.getenv("APP_VERSION", "1.4.0"),
         environment=os.getenv("APP_ENV", "production"),
         host=os.getenv("HOST", default_host),
         port=_env_int("PORT", 8000),
@@ -132,6 +135,7 @@ def get_settings() -> Settings:
         max_preview_pages=_env_int("MAX_PREVIEW_PAGES", 30),
         max_total_preview_pages=_env_int("MAX_TOTAL_PREVIEW_PAGES", 500),
         max_ocr_pages=_env_int("MAX_OCR_PAGES", 200),
+        max_auto_ocr_pages=_env_int("MAX_AUTO_OCR_PAGES", 40),
         word_chunk_pages=_env_int("WORD_CHUNK_PAGES", 40),
         excel_chunk_pages=_env_int("EXCEL_CHUNK_PAGES", 50),
         max_word_total_pages=_env_int("MAX_WORD_TOTAL_PAGES", 8000),

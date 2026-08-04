@@ -2,7 +2,7 @@
 
 Private, on-prem PDF toolkit. Documents are processed **on your machine / server** — nothing is sent to a third-party cloud.
 
-**Version:** 1.2.0
+**Version:** 1.4.0
 
 ## Features
 
@@ -155,12 +155,27 @@ pdf suite/
 └── requirements.txt
 ```
 
+## Conversion pipeline (v1.4)
+
+**PDF → Excel** and **PDF → Word** now share a smarter path:
+
+1. **Text quality check** — detect empty / weak / good text layers  
+2. **Auto-OCR** (optional) — only for nearly empty scanned pages (`MAX_AUTO_OCR_PAGES`)  
+3. **Tables** — pdfplumber (multi-strategy) → Camelot → **schedule/text-row parser**  
+4. **Best-table scoring** — drops logo/stamp OCR junk when a real table is found  
+5. **Text fallback sheet** — if no table exists, Excel still exports page lines  
+6. **Word** — keeps letter paragraphs; embeds detected tables as real Word tables  
+7. **Scanned PDFs** prefer fast text (+OCR when empty) over layout image embedding  
+
+This fixes bank salary schedules and similar OCR’d tabular letters.
+
 ## Known limits
 
-- Table extraction quality depends on PDF layout (Camelot → pdfplumber → OCR fallback).
+- Table extraction quality still depends on PDF layout and OCR quality.
 - Visual/content editor coordinates are page-relative (not full Acrobat reflow).
 - OCR and Office conversion require system packages (bundled in Docker image).
 - 8 GB RAM hosts should avoid many concurrent large OCR jobs (`MAX_CONCURRENT_JOBS`).
+- Auto-OCR is capped (`MAX_AUTO_OCR_PAGES`, default 40) — run the OCR tool first for huge scans.
 
 ## License
 

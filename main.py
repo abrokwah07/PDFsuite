@@ -40,13 +40,12 @@ from reportlab.pdfgen import canvas
 
 from app.config import Settings, get_settings
 from app.conversion import (
-    convert_word_layout_chunked,
+    convert_pdf_to_excel,
+    convert_pdf_to_word,
     count_pages,
-    extract_tables_chunked,
     pages_label,
-    pdf_to_docx_fast,
     resolve_pages,
-    write_page_subset,
+    run_ocr,
 )
 from app.job_limit import JobLimiter, RateLimiter
 from app.jobs import JobStatus, JobStore
@@ -55,6 +54,7 @@ from app.office_compress import compress_ooxml
 from app.pdf_editor import apply_edits, inspect_page
 from app.pptx_convert import (
     OFFICE_FORMAT_MAP,
+    detect_source,
     libreoffice_convert,
     media_type_for_ext,
     pdf_to_pptx,
@@ -177,7 +177,16 @@ def create_app() -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
-        expose_headers=["X-Request-ID", "Content-Disposition"],
+        expose_headers=[
+            "X-Request-ID",
+            "Content-Disposition",
+            "X-Pages-Processed",
+            "X-Pages-Total",
+            "X-Convert-Engine",
+            "X-Convert-Detail",
+            "X-Chunks",
+            "X-Pages-Label",
+        ],
     )
     app.add_middleware(RequestContextMiddleware)
 
@@ -241,6 +250,16 @@ def create_app() -> FastAPI:
             "uptime_seconds": round(time.time() - request.app.state.started_at, 1),
         }
 
+    @app.get("/api/convert/detect")
+    async def convert_detect(filename: str = ""):
+        """
+        Given a filename, return detected source type and valid conversion targets.
+        Used by the Smart Convert UI so users only pick the *output* format.
+        """
+        info = detect_source(filename or "")
+        status = 200 if info.get("ok") else 400
+        return JSONResponse(status_code=status, content=info)
+
     @app.get("/ready")
     async def ready(request: Request):
         """Readiness: core Python PDF stack must work; system tools reported."""
@@ -282,6 +301,7 @@ def create_app() -> FastAPI:
                     "max_upload_mb": settings.max_upload_bytes // (1024 * 1024),
                     "max_files_per_request": settings.max_files_per_request,
                     "max_ocr_pages": settings.max_ocr_pages,
+                    "max_auto_ocr_pages": settings.max_auto_ocr_pages,
                     "max_word_pages": settings.max_word_total_pages,
                     "max_excel_pages": settings.max_excel_total_pages,
                     "word_chunk_pages": settings.word_chunk_pages,
@@ -289,6 +309,7 @@ def create_app() -> FastAPI:
                     "max_concurrent_jobs": settings.max_concurrent_jobs,
                     "auto_chunk_merge": True,
                     "background_jobs": True,
+                    "smart_scan_convert": True,
                     "max_pptx_pages": settings.max_pptx_total_pages,
                 },
             },
@@ -347,52 +368,34 @@ def create_app() -> FastAPI:
                 max_total=settings.max_word_total_pages,
                 label="PDF → Word",
             )
-            mode_norm = (mode or "auto").strip().lower()
-            use_layout = mode_norm == "layout" or (
-                mode_norm == "auto" and len(indices) <= settings.word_layout_page_threshold
-            )
-            if use_layout and Converter is None:
-                use_layout = False
-
             store.update(
                 job_id,
                 total=len(indices),
                 progress=5,
                 phase="converting",
-                message=f"Converting {len(indices)} pages ({'layout' if use_layout else 'fast'})…",
+                message=f"Converting {len(indices)} pages…",
             )
             if cancelled():
                 raise RuntimeError("cancelled")
 
-            if use_layout:
-                local_cleanup: list[str] = []
-                try:
-                    _pages, chunks_used = convert_word_layout_chunked(
-                        input_path=input_path,
-                        output_path=output_docx,
-                        indices=indices,
-                        chunk_size=settings.word_chunk_pages,
-                        converter_cls=Converter,
-                        make_temp=lambda s: make_temp_path(s, settings),
-                        cleanup=local_cleanup,
-                        on_progress=on_prog,
-                        should_cancel=cancelled,
-                    )
-                finally:
-                    for p in local_cleanup:
-                        safe_unlink(p)
-                label = pages_label(indices, total, chunks=chunks_used)
-                engine = "layout"
-            else:
-                pdf_to_docx_fast(
-                    input_path,
-                    output_docx,
-                    indices,
-                    on_progress=on_prog,
-                    should_cancel=cancelled,
-                )
-                label = pages_label(indices, total, chunks=1)
-                engine = "fast"
+            meta = convert_pdf_to_word(
+                input_path,
+                output_docx,
+                indices,
+                mode=mode,
+                layout_threshold=settings.word_layout_page_threshold,
+                chunk_size=settings.word_chunk_pages,
+                converter_cls=Converter,
+                enable_ocr=settings.enable_ocr and ocrmypdf is not None,
+                ocrmypdf_module=ocrmypdf,
+                make_temp=lambda s: make_temp_path(s, settings),
+                max_ocr_pages=settings.max_auto_ocr_pages,
+                on_progress=on_prog,
+                should_cancel=cancelled,
+            )
+            chunks_used = int(meta.get("chunks") or 1)
+            engine = str(meta.get("engine") or "fast")
+            label = pages_label(indices, total, chunks=chunks_used)
 
             if cancelled():
                 raise RuntimeError("cancelled")
@@ -408,7 +411,7 @@ def create_app() -> FastAPI:
                 status=JobStatus.completed,
                 progress=100,
                 phase="done",
-                message=f"Done — {label}",
+                message=f"Done — {label} ({engine})",
                 current=len(indices),
                 total=len(indices),
                 result_path=output_docx,
@@ -482,6 +485,7 @@ def create_app() -> FastAPI:
             )
             excel_files: list[tuple[str, str]] = []
             last_label = ""
+            last_engine = ""
 
             for name, input_path in items:
                 if cancelled():
@@ -510,38 +514,37 @@ def create_app() -> FastAPI:
                         message=f"Scanning page {cur} of {tot}",
                     )
 
-                all_tables = extract_tables_chunked(
+                out_path = make_temp_path(".xlsx", settings)
+                temps.append(out_path)
+                meta = convert_pdf_to_excel(
                     input_path,
+                    out_path,
                     indices,
-                    chunk_size=settings.excel_chunk_pages,
                     pd_module=pd,
+                    chunk_size=settings.excel_chunk_pages,
                     camelot_module=camelot,
                     enable_camelot=settings.enable_camelot and camelot is not None,
+                    enable_ocr=settings.enable_ocr and ocrmypdf is not None,
+                    ocrmypdf_module=ocrmypdf,
+                    make_temp=lambda s: make_temp_path(s, settings),
+                    max_ocr_pages=settings.max_auto_ocr_pages,
                     on_progress=on_prog,
                     should_cancel=cancelled,
                 )
-                if all_tables:
-                    for i in range(len(all_tables)):
-                        all_tables[i].columns = range(all_tables[i].shape[1])
-                    master_df = pd.concat(all_tables, ignore_index=True)
-                    master_df.dropna(how="all", inplace=True)
-                    out_path = make_temp_path(".xlsx", settings)
-                    temps.append(out_path)
-                    master_df.to_excel(
-                        out_path, index=False, header=False, sheet_name="Master_Data"
-                    )
-                    stem = Path(name).stem
-                    if total > 0 and len(indices) < total:
-                        out_name = f"{stem}_p{indices[0] + 1}-{indices[-1] + 1}.xlsx"
-                    else:
-                        out_name = f"{stem}.xlsx"
-                    excel_files.append((out_name, out_path))
+                last_engine = str(meta.get("engine") or "")
+                stem = Path(name).stem
+                if total > 0 and len(indices) < total:
+                    out_name = f"{stem}_p{indices[0] + 1}-{indices[-1] + 1}.xlsx"
+                else:
+                    out_name = f"{stem}.xlsx"
+                excel_files.append((out_name, out_path))
 
             if cancelled():
                 raise RuntimeError("cancelled")
             if not excel_files:
                 raise RuntimeError(
-                    "No readable tables found. Try a page range that contains tables."
+                    "No readable tables found. Try a page range that contains tables, "
+                    "or run OCR first for scanned PDFs."
                 )
 
             if len(excel_files) == 1:
@@ -557,12 +560,15 @@ def create_app() -> FastAPI:
                 result_name = "Batch_Excel_Extraction.zip"
                 media = "application/zip"
 
+            done_msg = f"Done — {last_label}" if last_label else "Done"
+            if last_engine:
+                done_msg += f" ({last_engine})"
             store.update(
                 job_id,
                 status=JobStatus.completed,
                 progress=100,
                 phase="done",
-                message=f"Done — {last_label}" if last_label else "Done",
+                message=done_msg,
                 result_path=result_path,
                 result_name=result_name,
                 media_type=media,
@@ -570,6 +576,7 @@ def create_app() -> FastAPI:
             j = store.get(job_id)
             if j:
                 j.meta["pages_label"] = last_label
+                j.meta["engine"] = last_engine
                 # Keep result; clean other temps on discard except result
                 j.cleanup_paths = [p for p in temps if p != result_path]
         except RuntimeError as exc:
@@ -1278,7 +1285,17 @@ def create_app() -> FastAPI:
                 )
 
             async with _limiter(request).slot(label="OCR job"):
-                ocrmypdf.ocr(input_path, output_path, force_ocr=True, progress_bar=False)
+
+                def _ocr_job() -> None:
+                    run_ocr(
+                        input_path,
+                        output_path,
+                        ocrmypdf_module=ocrmypdf,
+                        force=True,
+                        deskew=True,
+                    )
+
+                await asyncio.to_thread(_ocr_job)
 
             return file_response(
                 output_path,
@@ -1482,60 +1499,38 @@ def create_app() -> FastAPI:
                 label="PDF → Word",
             )
 
-            # Auto: layout only for short jobs; full books use fast + chunkless text
-            use_layout = mode_norm == "layout" or (
-                mode_norm == "auto" and len(indices) <= settings.word_layout_page_threshold
-            )
-            if use_layout and Converter is None:
-                use_layout = False
-
-            chunks_used = 1
-            if use_layout:
-                chunks_used = max(1, (len(indices) + settings.word_chunk_pages - 1) // settings.word_chunk_pages)
-
-            label = pages_label(indices, total, chunks=chunks_used if use_layout else 1)
             logger.info(
-                "to-word file=%s total=%s pages=%s mode=%s engine=%s chunks~%s",
+                "to-word file=%s total=%s pages=%s mode=%s",
                 name,
                 total,
                 len(indices),
                 mode_norm,
-                "layout" if use_layout else "fast",
-                chunks_used,
             )
 
             async with _limiter(request).slot(label="conversion job"):
-                if use_layout:
 
-                    def _layout_job() -> tuple[int, int]:
-                        local_cleanup: list[str] = []
-                        try:
-                            return convert_word_layout_chunked(
-                                input_path=input_path,
-                                output_path=output_docx,
-                                indices=indices,
-                                chunk_size=settings.word_chunk_pages,
-                                converter_cls=Converter,
-                                make_temp=lambda s: make_temp_path(s, settings),
-                                cleanup=local_cleanup,
-                            )
-                        finally:
-                            for p in local_cleanup:
-                                safe_unlink(p)
-
-                    _pages, chunks_used = await asyncio.to_thread(_layout_job)
-                    label = pages_label(indices, total, chunks=chunks_used)
-                else:
-                    await asyncio.to_thread(pdf_to_docx_fast, input_path, output_docx, indices)
-                    # Fast path is one pass; still report batching intent for huge docs
-                    chunks_used = max(
-                        1,
-                        (len(indices) + max(settings.word_chunk_pages, 1) - 1)
-                        // max(settings.word_chunk_pages, 1),
+                def _word_job() -> dict:
+                    return convert_pdf_to_word(
+                        input_path,
+                        output_docx,
+                        indices,
+                        mode=mode_norm,
+                        layout_threshold=settings.word_layout_page_threshold,
+                        chunk_size=settings.word_chunk_pages,
+                        converter_cls=Converter,
+                        enable_ocr=settings.enable_ocr and ocrmypdf is not None,
+                        ocrmypdf_module=ocrmypdf,
+                        make_temp=lambda s: make_temp_path(s, settings),
+                        max_ocr_pages=settings.max_auto_ocr_pages,
                     )
-                    # Don't claim multi-merge for single-pass fast
-                    chunks_used = 1
-                    label = pages_label(indices, total, chunks=1)
+
+                meta = await asyncio.to_thread(_word_job)
+
+            chunks_used = int(meta.get("chunks") or 1)
+            engine = str(meta.get("engine") or "fast")
+            # Header stays simple for tests: layout | fast
+            engine_header = "layout" if engine.startswith("layout") else "fast"
+            label = pages_label(indices, total, chunks=chunks_used)
 
             base_name = Path(name).stem
             if total > 0 and len(indices) < total:
@@ -1552,7 +1547,8 @@ def create_app() -> FastAPI:
             )
             resp.headers["X-Pages-Processed"] = str(len(indices))
             resp.headers["X-Pages-Total"] = str(total)
-            resp.headers["X-Convert-Engine"] = "layout" if use_layout else "fast"
+            resp.headers["X-Convert-Engine"] = engine_header
+            resp.headers["X-Convert-Detail"] = engine
             resp.headers["X-Chunks"] = str(chunks_used)
             resp.headers["X-Pages-Label"] = label
             return resp
@@ -1587,6 +1583,7 @@ def create_app() -> FastAPI:
         excel_files: list[tuple[str, str]] = []
         temps: list[str] = []
         last_label = ""
+        last_engine = ""
 
         try:
             async with _limiter(request).slot(label="extraction job"):
@@ -1618,85 +1615,48 @@ def create_app() -> FastAPI:
                         n_chunks,
                     )
 
-                    all_tables: list = []
-                    try:
-                        all_tables = await asyncio.to_thread(
-                            extract_tables_chunked,
-                            input_path,
-                            indices,
-                            chunk_size=settings.excel_chunk_pages,
+                    out_path = make_temp_path(".xlsx", settings)
+                    temps.append(out_path)
+
+                    def _excel_job(
+                        src: str = input_path,
+                        dest: str = out_path,
+                        idxs: list[int] = indices,
+                    ) -> dict:
+                        return convert_pdf_to_excel(
+                            src,
+                            dest,
+                            idxs,
                             pd_module=pd,
+                            chunk_size=settings.excel_chunk_pages,
                             camelot_module=camelot,
                             enable_camelot=settings.enable_camelot and camelot is not None,
+                            enable_ocr=settings.enable_ocr and ocrmypdf is not None,
+                            ocrmypdf_module=ocrmypdf,
+                            make_temp=lambda s: make_temp_path(s, settings),
+                            max_ocr_pages=settings.max_auto_ocr_pages,
                         )
-                    except Exception as exc:
-                        logger.info("chunked table extraction failed: %s", exc)
-                        all_tables = []
 
-                    # OCR rescue only for small explicit ranges that found nothing
-                    if (
-                        not all_tables
-                        and settings.enable_ocr
-                        and ocrmypdf is not None
-                        and len(indices) <= 20
-                    ):
-                        subset_path = make_temp_path(".pdf", settings)
-                        temps.append(subset_path)
-                        ocr_path = make_temp_path(".pdf", settings)
-                        temps.append(ocr_path)
-                        try:
-                            await asyncio.to_thread(
-                                write_page_subset, input_path, subset_path, indices
-                            )
-
-                            def _ocr() -> None:
-                                ocrmypdf.ocr(
-                                    subset_path,
-                                    ocr_path,
-                                    force_ocr=True,
-                                    output_type="pdf",
-                                    deskew=True,
-                                    progress_bar=False,
-                                )
-
-                            await asyncio.to_thread(_ocr)
-                            from app.conversion import extract_tables_pdfplumber
-
-                            all_tables = await asyncio.to_thread(
-                                extract_tables_pdfplumber,
-                                ocr_path,
-                                list(range(len(indices))),
-                                pd_module=pd,
-                            )
-                        except Exception as exc:
-                            logger.info("OCR table rescue failed: %s", exc)
-
-                    if all_tables:
-                        for i in range(len(all_tables)):
-                            all_tables[i].columns = range(all_tables[i].shape[1])
-                        master_df = pd.concat(all_tables, ignore_index=True)
-                        master_df.dropna(how="all", inplace=True)
-                        out_path = make_temp_path(".xlsx", settings)
-                        await asyncio.to_thread(
-                            master_df.to_excel,
-                            out_path,
-                            index=False,
-                            header=False,
-                            sheet_name="Master_Data",
-                        )
+                    try:
+                        meta = await asyncio.to_thread(_excel_job)
+                        last_engine = str(meta.get("engine") or "")
                         stem = Path(name).stem
                         if total > 0 and len(indices) < total:
                             out_name = f"{stem}_p{indices[0] + 1}-{indices[-1] + 1}.xlsx"
                         else:
                             out_name = f"{stem}.xlsx"
                         excel_files.append((out_name, out_path))
+                    except HTTPException:
+                        raise
+                    except Exception as exc:
+                        logger.info("excel conversion failed for %s: %s", name, exc)
 
             if not excel_files:
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        "No readable tables found. "
-                        "Try a page range that contains tables, or a different PDF."
+                        "No readable tables or text found. "
+                        "Try running OCR first for scanned PDFs, or pick pages with tables."
                     ),
                 )
 
@@ -1710,6 +1670,8 @@ def create_app() -> FastAPI:
                 )
                 if last_label:
                     resp.headers["X-Pages-Label"] = last_label
+                if last_engine:
+                    resp.headers["X-Convert-Engine"] = last_engine
                 return resp
 
             zip_path = make_temp_path(".zip", settings)

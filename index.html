@@ -109,11 +109,8 @@
 
         <div class="flex-grow overflow-y-auto py-4 px-3 space-y-1" id="nav-menu">
             <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3 mt-2 nav-section-label">Convert</div>
-            <button onclick="switchTool('pdf-export')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400 active-tool" data-target="tool-pdf-export">
-                <div class="text-emerald-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg></div><span>PDF → Office</span>
-            </button>
-            <button onclick="switchTool('office-convert')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-office-convert">
-                <div class="text-indigo-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg></div><span>Office convert</span>
+            <button onclick="switchTool('smart-convert')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400 active-tool" data-target="tool-smart-convert">
+                <div class="text-emerald-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg></div><span>Smart Convert</span>
             </button>
             <button onclick="switchTool('compress-office')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-compress-office">
                 <div class="text-rose-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg></div>
@@ -172,58 +169,43 @@
     <section class="w-96 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 shadow-xl overflow-y-auto overflow-x-hidden">
         <div class="p-8 h-full flex flex-col" id="tools-container">
 
-            <!-- Unified: PDF → Word / Excel / PowerPoint -->
-            <div id="tool-pdf-export" class="tool-section block h-full flex flex-col">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDF → Office</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Export a PDF to <strong>Word</strong>, <strong>Excel</strong>, or <strong>PowerPoint</strong>. One place — pick the format.</p>
+            <!-- Smart Convert: auto-detect source, user only picks target -->
+            <div id="tool-smart-convert" class="tool-section block h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Smart Convert</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Drop any supported file. We detect the type — you only choose <strong>what to convert to</strong>.</p>
                 <div class="mb-6 flex-grow space-y-3">
-                    <input type="file" id="pdf-export-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
-                    <div>
-                        <label for="pdf-export-format" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Output format</label>
-                        <select id="pdf-export-format" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
-                            <option value="word">Word (.docx)</option>
-                            <option value="excel">Excel (.xlsx) — tables</option>
-                            <option value="pptx">PowerPoint (.pptx) — page as slides</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="pdf-export-pages" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Page range (optional)</label>
-                        <input type="text" id="pdf-export-pages" placeholder="Empty = whole document · e.g. 1-50" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
-                    </div>
-                    <div id="pdf-export-word-opts">
-                        <label for="pdf-export-word-mode" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Word mode</label>
-                        <select id="pdf-export-word-mode" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
-                            <option value="auto" selected>Auto (recommended)</option>
-                            <option value="fast">Fast text (long PDFs)</option>
-                            <option value="layout">Layout accurate (slower)</option>
-                        </select>
-                    </div>
-                    <p class="text-[11px] text-slate-400 dark:text-slate-500">Runs as a background job with progress. PowerPoint max ~500 pages (use a range for longer PDFs).</p>
-                </div>
-                <button id="pdf-export-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert</button>
-            </div>
+                    <input type="file" id="smart-convert-input" accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.odt,.odp,.ods,application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-900/20 file:text-emerald-700 dark:file:text-emerald-400 hover:file:bg-emerald-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="onSmartConvertFile(this)">
 
-            <!-- Unified: Office → PDF / Word / PPTX / Excel -->
-            <div id="tool-office-convert" class="tool-section hidden h-full flex flex-col">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Office convert</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Word, Excel, PowerPoint, and OpenDocument — convert to PDF or another Office format (LibreOffice).</p>
-                <div class="mb-6 flex-grow space-y-3">
-                    <input type="file" id="office-convert-input" accept=".docx,.doc,.pptx,.ppt,.xlsx,.xls,.odt,.odp,.ods" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/20 file:text-indigo-700 dark:file:text-indigo-400 hover:file:bg-indigo-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
-                    <div>
-                        <label for="office-convert-target" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Convert to</label>
-                        <select id="office-convert-target" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-indigo-500">
-                            <option value="pdf" selected>PDF</option>
-                            <option value="docx">Word (.docx)</option>
-                            <option value="pptx">PowerPoint (.pptx)</option>
-                            <option value="xlsx">Excel (.xlsx)</option>
-                            <option value="odt">OpenDocument Text</option>
-                            <option value="odp">OpenDocument Presentation</option>
-                            <option value="ods">OpenDocument Spreadsheet</option>
-                        </select>
-                        <p class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">Examples: PPTX → PDF, PPTX → Word, Word → PPTX. Layout can shift slightly between apps.</p>
+                    <div id="smart-source-card" class="hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-2.5">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Detected source</p>
+                        <p id="smart-source-label" class="text-sm font-bold text-slate-800 dark:text-slate-100 mt-0.5">—</p>
+                        <p id="smart-source-file" class="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5"></p>
                     </div>
+
+                    <div id="smart-target-wrap" class="hidden">
+                        <label for="smart-convert-target" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Convert to</label>
+                        <select id="smart-convert-target" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500"></select>
+                        <p id="smart-target-hint" class="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500"></p>
+                    </div>
+
+                    <div id="smart-pages-wrap" class="hidden">
+                        <label for="smart-convert-pages" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Page range (optional, PDF only)</label>
+                        <input type="text" id="smart-convert-pages" placeholder="Empty = whole document · e.g. 1-50" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
+                    </div>
+
+                    <div id="smart-word-mode-wrap" class="hidden">
+                        <label for="smart-convert-word-mode" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Word mode</label>
+                        <select id="smart-convert-word-mode" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500">
+                            <option value="auto" selected>Auto (recommended — scans use text+tables)</option>
+                            <option value="fast">Fast text + tables (scanned letters, long PDFs)</option>
+                            <option value="layout">Layout accurate (born-digital, slower)</option>
+                        </select>
+                    </div>
+
+                    <p id="smart-error" class="hidden text-xs text-red-500 font-medium"></p>
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">Supported: PDF, Word, Excel, PowerPoint, OpenDocument. Scanned PDFs auto-detect tables (salary schedules, etc.). Jobs show progress and can be cancelled.</p>
                 </div>
-                <button id="office-convert-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-indigo-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert</button>
+                <button id="smart-convert-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert</button>
             </div>
 
             <div id="tool-manipulate" class="tool-section hidden h-full flex flex-col">
@@ -372,7 +354,7 @@
 
             <div id="tool-ocr" class="tool-section hidden h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Searchable PDF</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">Make text selectable.</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-8">OCR scans so text is selectable. Convert to Word/Excel also auto-OCR’s empty pages when Tesseract is installed.</p>
                 <div class="mb-6 flex-grow">
                     <input type="file" id="ocr-input" accept="application/pdf" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 dark:file:bg-yellow-900/20 file:text-yellow-700 dark:file:text-yellow-400 hover:file:bg-yellow-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                 </div>
@@ -440,7 +422,9 @@
     </section>
 
     <script>
-        let currentActiveTool = 'pdf-export';
+        let currentActiveTool = 'smart-convert';
+        let smartDetectInfo = null;
+
         let currentUploadedFiles = [];
         let currentPageStart = 0;
         let loadedPreviewImages = [];
@@ -655,6 +639,9 @@
             try {
                 if (currentActiveTool === 'merge' && currentUploadedFiles.length > 1) {
                     await fetchMergePreview();
+                } else if (currentActiveTool === 'smart-convert' && currentUploadedFiles[0] && !/\.pdf$/i.test(currentUploadedFiles[0].name)) {
+                    // Non-PDF office files: skip PDF preview raster
+                    showPreviewWithoutImage(currentUploadedFiles[0].name, 'Office document ready');
                 } else {
                     await fetchPreviewData();
                 }
@@ -662,6 +649,11 @@
                 // Keep file selection even if preview blows up
                 console.warn('preview error', err);
                 showPreviewWithoutImage(currentUploadedFiles[0].name, "Ready to convert (preview unavailable)");
+            }
+
+            // Keep Smart Convert target list in sync (drag-drop or file picker)
+            if (currentActiveTool === 'smart-convert' && typeof refreshSmartConvertUI === 'function') {
+                await refreshSmartConvertUI();
             }
         }
 
@@ -1313,63 +1305,149 @@
             }
         }
 
-        // --- BUTTON EVENT LISTENERS ---
-        const pdfExportFormat = document.getElementById('pdf-export-format');
-        const pdfExportWordOpts = document.getElementById('pdf-export-word-opts');
-        function syncPdfExportOpts() {
-            if (!pdfExportFormat || !pdfExportWordOpts) return;
-            pdfExportWordOpts.classList.toggle('hidden', pdfExportFormat.value !== 'word');
-        }
-        if (pdfExportFormat) {
-            pdfExportFormat.addEventListener('change', syncPdfExportOpts);
-            syncPdfExportOpts();
+        // --- SMART CONVERT (auto-detect source, user picks target only) ---
+        async function onSmartConvertFile(inputEl) {
+            // Keep global file state / preview in sync
+            await triggerFileSelect(inputEl);
+            await refreshSmartConvertUI();
         }
 
-        document.getElementById('pdf-export-btn').addEventListener('click', () => {
-            if (!currentUploadedFiles.length) {
-                showToast('Please choose a PDF first.', 'error');
+        function resetSmartConvertUI() {
+            smartDetectInfo = null;
+            const card = document.getElementById('smart-source-card');
+            const targetWrap = document.getElementById('smart-target-wrap');
+            const pagesWrap = document.getElementById('smart-pages-wrap');
+            const wordWrap = document.getElementById('smart-word-mode-wrap');
+            const err = document.getElementById('smart-error');
+            const btn = document.getElementById('smart-convert-btn');
+            if (card) card.classList.add('hidden');
+            if (targetWrap) targetWrap.classList.add('hidden');
+            if (pagesWrap) pagesWrap.classList.add('hidden');
+            if (wordWrap) wordWrap.classList.add('hidden');
+            if (err) { err.classList.add('hidden'); err.textContent = ''; }
+            if (btn) btn.disabled = true;
+        }
+
+        async function refreshSmartConvertUI() {
+            const file = currentUploadedFiles[0];
+            const card = document.getElementById('smart-source-card');
+            const targetWrap = document.getElementById('smart-target-wrap');
+            const pagesWrap = document.getElementById('smart-pages-wrap');
+            const wordWrap = document.getElementById('smart-word-mode-wrap');
+            const err = document.getElementById('smart-error');
+            const btn = document.getElementById('smart-convert-btn');
+            const sel = document.getElementById('smart-convert-target');
+            const hint = document.getElementById('smart-target-hint');
+
+            if (!file) {
+                resetSmartConvertUI();
                 return;
             }
-            const fmt = (document.getElementById('pdf-export-format').value || 'word');
-            const pages = (document.getElementById('pdf-export-pages').value || '').trim();
-            const formData = new FormData();
-            const base = currentUploadedFiles[0].name.replace(/\.pdf$/i, '');
-            const btn = document.getElementById('pdf-export-btn');
 
-            if (fmt === 'excel') {
-                currentUploadedFiles.forEach((f) => formData.append('files', f));
+            try {
+                const res = await fetch(`/api/convert/detect?filename=${encodeURIComponent(file.name)}`);
+                const info = await res.json();
+                smartDetectInfo = info;
+
+                if (!info.ok) {
+                    card.classList.remove('hidden');
+                    document.getElementById('smart-source-label').textContent = info.label || 'Unknown';
+                    document.getElementById('smart-source-file').textContent = file.name;
+                    targetWrap.classList.add('hidden');
+                    pagesWrap.classList.add('hidden');
+                    wordWrap.classList.add('hidden');
+                    err.classList.remove('hidden');
+                    err.textContent = info.error || 'Unsupported file type.';
+                    btn.disabled = true;
+                    showToast(info.error || 'Unsupported file type.', 'error');
+                    return;
+                }
+
+                err.classList.add('hidden');
+                card.classList.remove('hidden');
+                document.getElementById('smart-source-label').textContent = info.label;
+                document.getElementById('smart-source-file').textContent = file.name;
+
+                // Populate targets
+                sel.innerHTML = '';
+                (info.targets || []).forEach((t, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = t.id;
+                    opt.textContent = t.label;
+                    opt.dataset.route = t.route;
+                    opt.dataset.hint = t.hint || '';
+                    if (i === 0) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+                targetWrap.classList.remove('hidden');
+                pagesWrap.classList.toggle('hidden', !info.supports_pages);
+                syncSmartWordMode();
+                hint.textContent = (info.targets[0] && info.targets[0].hint) || '';
+                btn.disabled = !(info.targets && info.targets.length);
+            } catch (e) {
+                err.classList.remove('hidden');
+                err.textContent = 'Could not detect file type. Is the server running?';
+                btn.disabled = true;
+            }
+        }
+
+        function syncSmartWordMode() {
+            const info = smartDetectInfo;
+            const wordWrap = document.getElementById('smart-word-mode-wrap');
+            const sel = document.getElementById('smart-convert-target');
+            if (!wordWrap || !sel) return;
+            const show = info && info.supports_word_mode && sel.value === 'word';
+            wordWrap.classList.toggle('hidden', !show);
+            const opt = sel.options[sel.selectedIndex];
+            const hint = document.getElementById('smart-target-hint');
+            if (hint && opt) hint.textContent = opt.dataset.hint || '';
+        }
+
+        const smartTargetSel = document.getElementById('smart-convert-target');
+        if (smartTargetSel) smartTargetSel.addEventListener('change', syncSmartWordMode);
+
+        document.getElementById('smart-convert-btn').addEventListener('click', () => {
+            if (!currentUploadedFiles.length || !smartDetectInfo || !smartDetectInfo.ok) {
+                showToast('Please choose a supported file first.', 'error');
+                return;
+            }
+            const file = currentUploadedFiles[0];
+            const sel = document.getElementById('smart-convert-target');
+            const targetId = sel.value;
+            const opt = sel.options[sel.selectedIndex];
+            const route = opt && opt.dataset.route;
+            const pages = (document.getElementById('smart-convert-pages').value || '').trim();
+            const formData = new FormData();
+            const base = file.name.replace(/\.[^.]+$/, '');
+            const btn = document.getElementById('smart-convert-btn');
+
+            if (route === 'pdf_excel') {
+                formData.append('files', file);
                 formData.append('pages', pages);
-                processJob('/api/jobs/convert/to-excel', formData, btn, 'PDF → Excel', 'Extracting tables…', `${base}.xlsx`);
-            } else if (fmt === 'pptx') {
-                formData.append('file', currentUploadedFiles[0]);
+                processJob('/api/jobs/convert/to-excel', formData, btn, `PDF → Excel`, 'Extracting tables…', `${base}.xlsx`);
+            } else if (route === 'pdf_pptx') {
+                formData.append('file', file);
                 formData.append('pages', pages);
-                processJob('/api/jobs/convert/to-pptx', formData, btn, 'PDF → PowerPoint', 'Building slides…', `${base}.pptx`);
+                processJob('/api/jobs/convert/to-pptx', formData, btn, `PDF → PowerPoint`, 'Building slides…', `${base}.pptx`);
+            } else if (route === 'pdf_word') {
+                formData.append('file', file);
+                formData.append('pages', pages);
+                formData.append('mode', document.getElementById('smart-convert-word-mode').value || 'auto');
+                processJob('/api/jobs/convert/to-word', formData, btn, `PDF → Word`, 'Converting…', `${base}.docx`);
+            } else if (route === 'office') {
+                formData.append('file', file);
+                formData.append('target', targetId);
+                processJob(
+                    '/api/jobs/convert/office',
+                    formData,
+                    btn,
+                    `${smartDetectInfo.label} → ${targetId.toUpperCase()}`,
+                    `Converting to ${targetId.toUpperCase()}…`,
+                    `${base}.${targetId}`
+                );
             } else {
-                formData.append('file', currentUploadedFiles[0]);
-                formData.append('pages', pages);
-                formData.append('mode', document.getElementById('pdf-export-word-mode').value || 'auto');
-                processJob('/api/jobs/convert/to-word', formData, btn, 'PDF → Word', 'Converting…', `${base}.docx`);
+                showToast('Unknown conversion route.', 'error');
             }
-        });
-
-        document.getElementById('office-convert-btn').addEventListener('click', () => {
-            if (!currentUploadedFiles.length) {
-                showToast('Please choose a file first.', 'error');
-                return;
-            }
-            const formData = new FormData();
-            formData.append('file', currentUploadedFiles[0]);
-            const target = document.getElementById('office-convert-target').value || 'pdf';
-            formData.append('target', target);
-            const base = currentUploadedFiles[0].name.replace(/\.[^.]+$/, '');
-            processJob(
-                '/api/jobs/convert/office',
-                formData,
-                document.getElementById('office-convert-btn'),
-                'Office convert',
-                `Converting to ${target.toUpperCase()}…`,
-                `${base}.${target}`
-            );
         });
 
         document.getElementById('manipulate-btn').addEventListener('click', () => {
