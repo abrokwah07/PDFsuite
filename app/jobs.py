@@ -78,11 +78,18 @@ class Job:
 class JobStore:
     """Thread-safe in-memory job registry (single process)."""
 
-    def __init__(self, *, ttl_seconds: int = 3600, max_jobs: int = 100) -> None:
+    def __init__(
+        self,
+        *,
+        ttl_seconds: int = 3600,
+        max_jobs: int = 100,
+        on_terminal: Callable[[Job], None] | None = None,
+    ) -> None:
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
         self.ttl_seconds = ttl_seconds
         self.max_jobs = max_jobs
+        self._on_terminal = on_terminal
 
     def create(self, kind: str, **meta: Any) -> Job:
         self.purge_expired()
@@ -97,6 +104,17 @@ class JobStore:
     def get(self, job_id: str) -> Job | None:
         with self._lock:
             return self._jobs.get(job_id)
+
+    def list_jobs(self, limit: int = 40) -> list[dict[str, Any]]:
+        """Newest-first job history for the UI."""
+        limit = max(1, min(limit, 200))
+        with self._lock:
+            jobs = sorted(
+                self._jobs.values(),
+                key=lambda j: j.updated_at,
+                reverse=True,
+            )
+            return [j.to_dict() for j in jobs[:limit]]
 
     def update(
         self,
@@ -113,6 +131,7 @@ class JobStore:
         result_name: str | None = None,
         media_type: str | None = None,
     ) -> None:
+        terminal_job: Job | None = None
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
@@ -123,6 +142,7 @@ class JobStore:
             }:
                 # Don't resurrect cancelled jobs
                 return
+            prev_status = job.status
             if status is not None:
                 job.status = status
             if progress is not None:
@@ -144,6 +164,28 @@ class JobStore:
             if media_type is not None:
                 job.media_type = media_type
             job.updated_at = time.time()
+            if (
+                status is not None
+                and status
+                in {
+                    JobStatus.completed,
+                    JobStatus.failed,
+                    JobStatus.cancelled,
+                }
+                and prev_status
+                not in {
+                    JobStatus.completed,
+                    JobStatus.failed,
+                    JobStatus.cancelled,
+                }
+            ):
+                # Snapshot for audit callback outside lock
+                terminal_job = job
+        if terminal_job is not None and self._on_terminal is not None:
+            try:
+                self._on_terminal(terminal_job)
+            except Exception:
+                logger.exception("job terminal callback failed for %s", job_id)
 
     def progress_cb(self, job_id: str) -> Callable[..., None]:
         """Return a callback(current, total, phase=..., message=...)."""

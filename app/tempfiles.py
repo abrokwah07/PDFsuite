@@ -83,9 +83,18 @@ def file_response(
     media_type: str,
     background: BackgroundTasks,
     extra_cleanup: Iterable[str | Path | None] = (),
+    delete_after: bool = True,
 ) -> FileResponse:
-    """Return a FileResponse that deletes the file (and extras) after send."""
-    schedule_cleanup(background, path, *extra_cleanup)
+    """
+    Return a FileResponse.
+
+    By default deletes the primary file (and extras) after send.
+    Set ``delete_after=False`` for job-history re-downloads (TTL owns cleanup).
+    """
+    if delete_after:
+        schedule_cleanup(background, path, *extra_cleanup)
+    elif extra_cleanup:
+        schedule_cleanup(background, *extra_cleanup)
     return FileResponse(
         path=path,
         filename=filename,

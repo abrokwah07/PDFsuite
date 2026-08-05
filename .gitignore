@@ -37,6 +37,8 @@ Thumbs.db
 tmp/
 temp/
 /tmp/pdfsuite/
+data/
+*.jsonl
 
 # Docker
 *.log

@@ -38,20 +38,23 @@ from pypdf import PdfReader, PdfWriter
 from pypdf.constants import UserAccessPermissions
 from reportlab.pdfgen import canvas
 
+from app.audit import AuditLog
 from app.config import Settings, get_settings
 from app.conversion import (
     convert_pdf_to_excel,
     convert_pdf_to_word,
     count_pages,
     pages_label,
+    preview_tables,
     resolve_pages,
     run_ocr,
 )
 from app.job_limit import JobLimiter, RateLimiter
-from app.jobs import JobStatus, JobStore
+from app.jobs import Job, JobStatus, JobStore
 from app.middleware import RequestContextMiddleware
 from app.office_compress import compress_ooxml
 from app.pdf_editor import apply_edits, inspect_page
+from app.presets import get_preset, list_presets
 from app.pptx_convert import (
     OFFICE_FORMAT_MAP,
     detect_source,
@@ -136,7 +139,29 @@ async def lifespan(app: FastAPI):
     app.state.tesseract_path = _which("tesseract")
     app.state.job_limiter = JobLimiter(settings.max_concurrent_jobs)
     app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute)
-    app.state.job_store = JobStore(ttl_seconds=3600, max_jobs=80)
+
+    audit_path = (settings.temp_dir or settings.base_dir / "data") / "audit.jsonl"
+    audit = AuditLog(audit_path, max_entries=settings.audit_max_entries)
+    app.state.audit = audit
+
+    def _on_job_terminal(job: Job) -> None:
+        audit.append(
+            f"job.{job.kind}",
+            status=job.status.value,
+            detail=job.message or job.error or "",
+            filename=str(job.meta.get("filename") or job.result_name or ""),
+            job_id=job.id,
+            meta={
+                "result_name": job.result_name,
+                "downloadable": bool(job.result_path),
+            },
+        )
+
+    app.state.job_store = JobStore(
+        ttl_seconds=settings.job_history_ttl_seconds,
+        max_jobs=settings.job_history_max,
+        on_terminal=_on_job_terminal,
+    )
 
     logger.info(
         "Starting %s v%s env=%s gs=%s libreoffice=%s tesseract=%s ocrmypdf=%s camelot=%s api_key=%s",
@@ -296,10 +321,40 @@ def create_app() -> FastAPI:
                     "camelot": settings.enable_camelot and camelot is not None,
                     "edit": checks["pymupdf"],
                     "api_key_required": bool(settings.api_key),
+                    "batch": True,
+                    "presets": True,
+                    "job_history": True,
+                    "audit": True,
+                    "convert_preview": True,
+                },
+                "engines": {
+                    "ghostscript": {
+                        "ok": bool(request.app.state.gs_path)
+                        if settings.enable_ghostscript
+                        else False,
+                        "path": request.app.state.gs_path,
+                        "label": "Ghostscript",
+                    },
+                    "tesseract": {
+                        "ok": bool(request.app.state.tesseract_path)
+                        and ocrmypdf is not None
+                        if settings.enable_ocr
+                        else False,
+                        "path": request.app.state.tesseract_path,
+                        "label": "OCR (Tesseract)",
+                    },
+                    "libreoffice": {
+                        "ok": bool(request.app.state.libreoffice_path)
+                        if settings.enable_libreoffice
+                        else False,
+                        "path": request.app.state.libreoffice_path,
+                        "label": "LibreOffice",
+                    },
                 },
                 "limits": {
                     "max_upload_mb": settings.max_upload_bytes // (1024 * 1024),
                     "max_files_per_request": settings.max_files_per_request,
+                    "max_batch_files": settings.max_batch_files,
                     "max_ocr_pages": settings.max_ocr_pages,
                     "max_auto_ocr_pages": settings.max_auto_ocr_pages,
                     "max_word_pages": settings.max_word_total_pages,
@@ -307,6 +362,7 @@ def create_app() -> FastAPI:
                     "word_chunk_pages": settings.word_chunk_pages,
                     "excel_chunk_pages": settings.excel_chunk_pages,
                     "max_concurrent_jobs": settings.max_concurrent_jobs,
+                    "job_history_ttl_seconds": settings.job_history_ttl_seconds,
                     "auto_chunk_merge": True,
                     "background_jobs": True,
                     "smart_scan_convert": True,
@@ -1028,6 +1084,17 @@ def create_app() -> FastAPI:
         asyncio.create_task(_runner())
         return JSONResponse({"job_id": job.id, **job.to_dict()})
 
+    @app.get("/api/jobs")
+    async def job_list(request: Request, limit: int = 40):
+        """Recent job history (newest first). Results stay downloadable until TTL."""
+        store = _job_store(request)
+        jobs = store.list_jobs(limit=limit)
+        return {
+            "jobs": jobs,
+            "count": len(jobs),
+            "ttl_seconds": _settings(request).job_history_ttl_seconds,
+        }
+
     @app.get("/api/jobs/{job_id}")
     async def job_status(request: Request, job_id: str):
         job = _job_store(request).get(job_id)
@@ -1061,19 +1128,508 @@ def create_app() -> FastAPI:
                 detail=f"Job is not ready (status={job.status.value}).",
             )
         path = job.result_path
+        if not Path(path).is_file():
+            raise HTTPException(
+                status_code=410,
+                detail="Result file expired or was cleaned up. Run the job again.",
+            )
         name = job.result_name or "download.bin"
         media = job.media_type or "application/octet-stream"
-        # After download, schedule cleanup of this job
-        def _cleanup_job() -> None:
-            store.discard(job_id)
-
-        background.add_task(_cleanup_job)
+        # Keep file for re-download until job TTL; do not discard after first download.
         return file_response(
             path,
             filename=name,
             media_type=media,
             background=background,
+            delete_after=False,
         )
+
+    @app.get("/api/presets")
+    async def presets_list():
+        return {"presets": list_presets()}
+
+    @app.get("/api/audit")
+    async def audit_list(request: Request, limit: int = 50):
+        audit: AuditLog = request.app.state.audit
+        return {"events": audit.list_events(limit=limit), "count": min(limit, 500)}
+
+    @app.post("/api/convert/preview-tables")
+    async def convert_preview_tables(
+        request: Request,
+        file: UploadFile = File(...),
+        pages: str = Form(""),
+    ):
+        """Preview extracted tables as JSON before committing to Excel download."""
+        settings = _settings(request)
+        if pd is None:
+            raise HTTPException(status_code=503, detail="pandas is not installed.")
+        name, data = await read_upload(file, settings, allowed_extensions=PDF_EXTENSIONS)
+        input_path = write_bytes(data, ".pdf", settings)
+        try:
+            total = await asyncio.to_thread(count_pages, input_path)
+            indices = resolve_pages(
+                total_pages=total,
+                pages=pages,
+                max_total=min(settings.max_excel_total_pages, 40),
+                label="table preview",
+            )
+
+            def _preview() -> dict:
+                return preview_tables(
+                    input_path,
+                    indices,
+                    pd_module=pd,
+                    camelot_module=camelot,
+                    enable_camelot=settings.enable_camelot and camelot is not None,
+                    enable_ocr=settings.enable_ocr and ocrmypdf is not None,
+                    ocrmypdf_module=ocrmypdf,
+                    make_temp=lambda s: make_temp_path(s, settings),
+                    max_ocr_pages=settings.max_auto_ocr_pages,
+                    max_rows=60,
+                )
+
+            result = await asyncio.to_thread(_preview)
+            result["filename"] = name
+            request.app.state.audit.append(
+                "convert.preview_tables",
+                filename=name,
+                detail=f"{result.get('table_count', 0)} table(s)",
+                meta={"pages": len(indices), "engine": result.get("engine")},
+            )
+            return result
+        finally:
+            safe_unlink(input_path)
+
+    def _run_batch_job(
+        job_id: str,
+        store: JobStore,
+        settings: Settings,
+        *,
+        items: list[tuple[str, str]],
+        action: str,
+        pages: str = "",
+        mode: str = "auto",
+        force_ocr: bool = False,
+    ) -> None:
+        """Process many PDFs: merge → one PDF; other actions → zip of results."""
+        temps: list[str] = [p for _, p in items]
+        job = store.get(job_id)
+        if job:
+            job.cleanup_paths.extend(temps)
+
+        def cancelled() -> bool:
+            j = store.get(job_id)
+            return bool(j and j.cancelled())
+
+        action = (action or "").strip().lower()
+        try:
+            store.update(
+                job_id,
+                status=JobStatus.running,
+                progress=3,
+                phase="preparing",
+                message=f"Batch {action}: {len(items)} file(s)…",
+                total=len(items),
+                current=0,
+            )
+            if not items:
+                raise RuntimeError("No files in batch")
+
+            if action == "merge":
+                from pypdf import PdfReader, PdfWriter
+
+                writer = PdfWriter()
+                for i, (name, path) in enumerate(items, start=1):
+                    if cancelled():
+                        raise RuntimeError("cancelled")
+                    reader = PdfReader(path)
+                    for page in reader.pages:
+                        writer.add_page(page)
+                    store.update(
+                        job_id,
+                        progress=5 + (i / len(items) * 90),
+                        current=i,
+                        total=len(items),
+                        phase="merging",
+                        message=f"Merged {name}",
+                    )
+                out_path = make_temp_path(".pdf", settings)
+                temps.append(out_path)
+                with open(out_path, "wb") as out:
+                    writer.write(out)
+                store.update(
+                    job_id,
+                    status=JobStatus.completed,
+                    progress=100,
+                    phase="done",
+                    message=f"Merged {len(items)} PDFs",
+                    result_path=out_path,
+                    result_name="batch_merged.pdf",
+                    media_type="application/pdf",
+                )
+                j = store.get(job_id)
+                if j:
+                    j.cleanup_paths = [p for p in temps if p != out_path]
+                return
+
+            outputs: list[tuple[str, str]] = []
+            n = len(items)
+            for i, (name, path) in enumerate(items, start=1):
+                if cancelled():
+                    raise RuntimeError("cancelled")
+                stem = Path(name).stem
+                store.update(
+                    job_id,
+                    progress=5 + ((i - 1) / n * 90),
+                    current=i - 1,
+                    total=n,
+                    phase="processing",
+                    message=f"[{i}/{n}] {name}",
+                )
+                total_pages = count_pages(path)
+                indices = resolve_pages(
+                    total_pages=total_pages,
+                    pages=pages,
+                    max_total=(
+                        settings.max_word_total_pages
+                        if action in {"to-word", "word-and-excel"}
+                        else settings.max_excel_total_pages
+                        if action == "to-excel"
+                        else settings.max_ocr_pages
+                    ),
+                    label=f"batch {action}",
+                )
+
+                if action == "to-excel":
+                    if pd is None:
+                        raise RuntimeError("pandas is not installed")
+                    out_path = make_temp_path(".xlsx", settings)
+                    temps.append(out_path)
+                    convert_pdf_to_excel(
+                        path,
+                        out_path,
+                        indices,
+                        pd_module=pd,
+                        chunk_size=settings.excel_chunk_pages,
+                        camelot_module=camelot,
+                        enable_camelot=settings.enable_camelot and camelot is not None,
+                        enable_ocr=settings.enable_ocr and ocrmypdf is not None,
+                        ocrmypdf_module=ocrmypdf,
+                        make_temp=lambda s: make_temp_path(s, settings),
+                        max_ocr_pages=settings.max_auto_ocr_pages,
+                        force_ocr=force_ocr,
+                    )
+                    outputs.append((f"{stem}.xlsx", out_path))
+
+                elif action == "to-word":
+                    out_path = make_temp_path(".docx", settings)
+                    temps.append(out_path)
+                    convert_pdf_to_word(
+                        path,
+                        out_path,
+                        indices,
+                        mode=mode or "auto",
+                        layout_threshold=settings.word_layout_page_threshold,
+                        chunk_size=settings.word_chunk_pages,
+                        converter_cls=Converter,
+                        enable_ocr=settings.enable_ocr and ocrmypdf is not None,
+                        ocrmypdf_module=ocrmypdf,
+                        make_temp=lambda s: make_temp_path(s, settings),
+                        max_ocr_pages=settings.max_auto_ocr_pages,
+                        force_ocr=force_ocr,
+                    )
+                    outputs.append((f"{stem}.docx", out_path))
+
+                elif action == "ocr":
+                    if not settings.enable_ocr or ocrmypdf is None:
+                        raise RuntimeError("OCR is not available")
+                    if total_pages > settings.max_ocr_pages:
+                        raise RuntimeError(
+                            f"{name} has {total_pages} pages (OCR max {settings.max_ocr_pages})"
+                        )
+                    out_path = make_temp_path(".pdf", settings)
+                    temps.append(out_path)
+                    run_ocr(
+                        path,
+                        out_path,
+                        ocrmypdf_module=ocrmypdf,
+                        force=True,
+                        deskew=True,
+                    )
+                    outputs.append((f"{stem}_searchable.pdf", out_path))
+
+                elif action == "word-and-excel":
+                    if pd is None:
+                        raise RuntimeError("pandas is not installed")
+                    docx_path = make_temp_path(".docx", settings)
+                    xlsx_path = make_temp_path(".xlsx", settings)
+                    temps.extend([docx_path, xlsx_path])
+                    convert_pdf_to_word(
+                        path,
+                        docx_path,
+                        indices,
+                        mode=mode or "fast",
+                        layout_threshold=settings.word_layout_page_threshold,
+                        chunk_size=settings.word_chunk_pages,
+                        converter_cls=Converter,
+                        enable_ocr=settings.enable_ocr and ocrmypdf is not None,
+                        ocrmypdf_module=ocrmypdf,
+                        make_temp=lambda s: make_temp_path(s, settings),
+                        max_ocr_pages=settings.max_auto_ocr_pages,
+                        force_ocr=force_ocr,
+                    )
+                    convert_pdf_to_excel(
+                        path,
+                        xlsx_path,
+                        indices,
+                        pd_module=pd,
+                        chunk_size=settings.excel_chunk_pages,
+                        camelot_module=camelot,
+                        enable_camelot=settings.enable_camelot and camelot is not None,
+                        enable_ocr=settings.enable_ocr and ocrmypdf is not None,
+                        ocrmypdf_module=ocrmypdf,
+                        make_temp=lambda s: make_temp_path(s, settings),
+                        max_ocr_pages=settings.max_auto_ocr_pages,
+                        force_ocr=force_ocr,
+                    )
+                    outputs.append((f"{stem}.docx", docx_path))
+                    outputs.append((f"{stem}.xlsx", xlsx_path))
+                else:
+                    raise RuntimeError(f"Unknown batch action: {action}")
+
+                store.update(
+                    job_id,
+                    progress=5 + (i / n * 90),
+                    current=i,
+                    total=n,
+                    message=f"Done {name}",
+                )
+
+            if cancelled():
+                raise RuntimeError("cancelled")
+            if not outputs:
+                raise RuntimeError("No outputs produced")
+
+            if len(outputs) == 1:
+                result_path, result_name = outputs[0][1], outputs[0][0]
+                media = (
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    if result_name.endswith(".xlsx")
+                    else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    if result_name.endswith(".docx")
+                    else "application/pdf"
+                )
+            else:
+                result_path = make_temp_path(".zip", settings)
+                temps.append(result_path)
+                with zipfile.ZipFile(result_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                    for arcname, fpath in outputs:
+                        zf.write(fpath, arcname=arcname)
+                result_name = f"batch_{action}.zip"
+                media = "application/zip"
+
+            store.update(
+                job_id,
+                status=JobStatus.completed,
+                progress=100,
+                phase="done",
+                message=f"Batch complete — {len(items)} file(s)",
+                result_path=result_path,
+                result_name=result_name,
+                media_type=media,
+                current=n,
+                total=n,
+            )
+            j = store.get(job_id)
+            if j:
+                j.cleanup_paths = [p for p in temps if p != result_path]
+        except RuntimeError as exc:
+            if str(exc) == "cancelled":
+                store.update(
+                    job_id,
+                    status=JobStatus.cancelled,
+                    phase="cancelled",
+                    message="Cancelled",
+                )
+            else:
+                store.update(
+                    job_id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc),
+                    error=str(exc),
+                )
+            for p in temps:
+                safe_unlink(p)
+        except Exception as exc:
+            logger.exception("batch job %s failed", job_id)
+            detail = getattr(exc, "detail", None) or str(exc) or "Batch failed"
+            if not isinstance(detail, str):
+                detail = str(detail)
+            store.update(
+                job_id,
+                status=JobStatus.failed,
+                phase="error",
+                message=detail,
+                error=detail,
+            )
+            for p in temps:
+                safe_unlink(p)
+
+    @app.post("/api/jobs/batch")
+    async def job_batch(
+        request: Request,
+        files: List[UploadFile] = File(...),
+        action: str = Form("to-excel"),
+        pages: str = Form(""),
+        mode: str = Form("auto"),
+    ):
+        """
+        Batch process many PDFs (folder drop).
+
+        action: to-excel | to-word | ocr | merge | word-and-excel
+        """
+        settings = _settings(request)
+        store = _job_store(request)
+        action_norm = (action or "to-excel").strip().lower()
+        allowed = {"to-excel", "to-word", "ocr", "merge", "word-and-excel"}
+        if action_norm not in allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid action. Use one of: {', '.join(sorted(allowed))}",
+            )
+        if len(files) > settings.max_batch_files:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Too many files ({len(files)}). Max batch size is {settings.max_batch_files}.",
+            )
+        validate_file_count(len(files), settings)
+
+        items: list[tuple[str, str]] = []
+        for upload in files:
+            name, data = await read_upload(
+                upload, settings, allowed_extensions=PDF_EXTENSIONS
+            )
+            path = write_bytes(data, ".pdf", settings)
+            items.append((name, path))
+
+        job = store.create(
+            kind=f"batch_{action_norm}",
+            files=len(items),
+            filename=items[0][0] if items else "",
+            action=action_norm,
+        )
+        job.cleanup_paths.extend(p for _, p in items)
+        store.update(job.id, phase="queued", message="Queued…", progress=1)
+        request.app.state.audit.append(
+            "batch.start",
+            filename=items[0][0] if items else "",
+            detail=f"{action_norm} × {len(items)}",
+            job_id=job.id,
+        )
+
+        async def _runner() -> None:
+            try:
+                async with _limiter(request).slot(label="batch job"):
+                    await asyncio.to_thread(
+                        _run_batch_job,
+                        job.id,
+                        store,
+                        settings,
+                        items=items,
+                        action=action_norm,
+                        pages=pages,
+                        mode=mode,
+                    )
+            except HTTPException as exc:
+                store.update(
+                    job.id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc.detail),
+                    error=str(exc.detail),
+                )
+
+        asyncio.create_task(_runner())
+        return JSONResponse({"job_id": job.id, **job.to_dict()})
+
+    @app.post("/api/jobs/preset")
+    async def job_preset(
+        request: Request,
+        files: List[UploadFile] = File(...),
+        preset_id: str = Form(...),
+        pages: str = Form(""),
+    ):
+        """Run a named bank/HR preset on one or more PDFs."""
+        settings = _settings(request)
+        preset = get_preset(preset_id)
+        if not preset:
+            raise HTTPException(status_code=400, detail="Unknown preset.")
+        action = str(preset.get("action") or "")
+        mode = str(preset.get("mode") or "auto")
+        # Reuse batch endpoint logic by writing files and scheduling
+        store = _job_store(request)
+        if len(files) > settings.max_batch_files:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Too many files. Max is {settings.max_batch_files}.",
+            )
+        validate_file_count(len(files), settings)
+        items: list[tuple[str, str]] = []
+        for upload in files:
+            name, data = await read_upload(
+                upload, settings, allowed_extensions=PDF_EXTENSIONS
+            )
+            path = write_bytes(data, ".pdf", settings)
+            items.append((name, path))
+
+        job = store.create(
+            kind=f"preset_{preset['id']}",
+            files=len(items),
+            filename=items[0][0] if items else "",
+            preset=preset["id"],
+            action=action,
+        )
+        job.cleanup_paths.extend(p for _, p in items)
+        store.update(
+            job.id,
+            phase="queued",
+            message=f"Preset: {preset['name']}",
+            progress=1,
+        )
+        request.app.state.audit.append(
+            "preset.start",
+            filename=items[0][0] if items else "",
+            detail=preset["name"],
+            job_id=job.id,
+            meta={"preset_id": preset["id"]},
+        )
+
+        async def _runner() -> None:
+            try:
+                async with _limiter(request).slot(label="preset job"):
+                    await asyncio.to_thread(
+                        _run_batch_job,
+                        job.id,
+                        store,
+                        settings,
+                        items=items,
+                        action=action,
+                        pages=pages,
+                        mode=mode,
+                        force_ocr=bool(preset.get("force_ocr")),
+                    )
+            except HTTPException as exc:
+                store.update(
+                    job.id,
+                    status=JobStatus.failed,
+                    phase="error",
+                    message=str(exc.detail),
+                    error=str(exc.detail),
+                )
+
+        asyncio.create_task(_runner())
+        return JSONResponse({"job_id": job.id, **job.to_dict(), "preset": preset})
 
     # ------------------------------------------------------------------
     # PDF operations

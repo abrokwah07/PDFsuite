@@ -2,7 +2,7 @@
 
 Private, on-prem PDF toolkit. Documents are processed **on your machine / server** — nothing is sent to a third-party cloud.
 
-**Version:** 1.4.0
+**Version:** 1.5.0
 
 ## Features
 
@@ -155,7 +155,18 @@ pdf suite/
 └── requirements.txt
 ```
 
-## Conversion pipeline (v1.4)
+## What’s new in v1.5
+
+- **Batch / folder jobs** — multi-PDF convert, OCR, or merge → zip (or one merged PDF)
+- **Workflow presets** — salary → Excel, scan → Word, bank pack, etc.
+- **Table preview** — inspect extracted rows before Excel download
+- **Job history** — re-download results while still on disk (TTL)
+- **Audit log** — local activity trail
+- **⌘K command palette** — jump tools / recent jobs
+- **Engine badges** — Ghostscript / Tesseract / LibreOffice readiness
+- **Stronger empty-scan OCR** — image-only pages auto-OCR more aggressively
+
+## Conversion pipeline (v1.4+)
 
 **PDF → Excel** and **PDF → Word** now share a smarter path:
 

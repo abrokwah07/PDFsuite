@@ -229,8 +229,15 @@ def analyze_pdf_text(
 
         n = max(len(indices), 1)
         avg = total_chars / n
-        if empty >= max(1, int(n * 0.5)) and avg < 80:
+        empty_ratio = empty / n
+        image_ratio = image_pages / n
+        if empty_ratio >= 0.4 and avg < 100:
+            # Mostly blank text layer — image-only scan
             quality = "empty"
+            needs = True
+        elif image_ratio >= 0.5 and avg < 180:
+            # Image-heavy pages with thin text — force OCR for convert paths
+            quality = "empty" if avg < 60 else "weak"
             needs = True
         elif (
             avg < 120
@@ -238,10 +245,11 @@ def analyze_pdf_text(
             or weak_markers >= max(1, int(n * 0.5))
         ):
             # Weak / mixed OCR layer (common on phone scans of bank letters).
-            # Prefer native text first — embedded OCR often beats a second pass.
-            # Auto re-OCR only when pages are image-heavy with almost no text.
             quality = "weak"
-            needs = image_pages > 0 and avg < 80
+            # Re-OCR when image-backed and text is sparse or very noisy
+            needs = (image_pages > 0 and avg < 150) or (
+                weak_markers >= max(1, int(n * 0.6)) and avg < 200
+            )
         else:
             quality = "good"
             needs = False
@@ -1121,6 +1129,82 @@ def extract_tables_chunked(
     return all_frames
 
 
+def preview_tables(
+    input_path: str | Path,
+    indices: list[int],
+    *,
+    pd_module,
+    camelot_module=None,
+    enable_camelot: bool = False,
+    enable_ocr: bool = False,
+    ocrmypdf_module=None,
+    make_temp: Callable[[str], str] | None = None,
+    max_ocr_pages: int = 40,
+    max_rows: int = 80,
+) -> dict[str, Any]:
+    """
+    Extract tables for UI preview (no download).
+    Returns {quality, engine, tables: [{headers, rows, row_count, col_count}]}.
+    """
+    analysis = analyze_pdf_text(input_path, indices)
+    cleanup: list[str] = []
+    try:
+        work_path, work_indices, ocr_note = ensure_searchable_pdf(
+            input_path,
+            indices,
+            enable_ocr=enable_ocr
+            and (analysis["needs_ocr"] or analysis["quality"] in {"empty", "weak"}),
+            ocrmypdf_module=ocrmypdf_module,
+            make_temp=make_temp,
+            cleanup=cleanup,
+            max_ocr_pages=max_ocr_pages,
+            force_when_weak=analysis["needs_ocr"],
+        )
+        frames = extract_tables_chunked(
+            work_path,
+            work_indices,
+            chunk_size=50,
+            pd_module=pd_module,
+            camelot_module=camelot_module,
+            enable_camelot=enable_camelot,
+            include_text_fallback=True,
+        )
+        tables_out: list[dict[str, Any]] = []
+        for frame in frames[:5]:
+            df = _maybe_promote_header(frame.copy())
+            df = df.fillna("")
+            headers = [str(c) for c in df.columns.tolist()]
+            # If still RangeIndex-style ints, use generic names
+            if all(isinstance(c, int) for c in df.columns):
+                headers = [f"Col {i + 1}" for i in range(len(df.columns))]
+            rows = []
+            for _, row in df.head(max_rows).iterrows():
+                rows.append([str(v) if v is not None else "" for v in row.tolist()])
+            tables_out.append(
+                {
+                    "headers": headers,
+                    "rows": rows,
+                    "row_count": int(len(df)),
+                    "col_count": int(len(headers)),
+                    "truncated": bool(len(df) > max_rows),
+                }
+            )
+        return {
+            "quality": analysis["quality"],
+            "needs_ocr": analysis["needs_ocr"],
+            "engine": ocr_note,
+            "pages": len(indices),
+            "tables": tables_out,
+            "table_count": len(tables_out),
+        }
+    finally:
+        for p in cleanup:
+            try:
+                Path(p).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+
 def write_excel_workbook(
     frames: list,
     output_path: str | Path,
@@ -1212,6 +1296,7 @@ def convert_pdf_to_excel(
     ocrmypdf_module=None,
     make_temp: Callable[[str], str] | None = None,
     max_ocr_pages: int = 40,
+    force_ocr: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
     should_cancel: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
@@ -1221,15 +1306,21 @@ def convert_pdf_to_excel(
     """
     cleanup: list[str] = []
     try:
+        analysis0 = analyze_pdf_text(input_path, indices)
         work_path, work_indices, ocr_note = ensure_searchable_pdf(
             input_path,
             indices,
-            enable_ocr=enable_ocr,
+            enable_ocr=enable_ocr
+            and (
+                force_ocr
+                or analysis0["needs_ocr"]
+                or analysis0["quality"] in {"empty", "weak"}
+            ),
             ocrmypdf_module=ocrmypdf_module,
             make_temp=make_temp,
             cleanup=cleanup,
             max_ocr_pages=max_ocr_pages,
-            force_when_weak=False,
+            force_when_weak=force_ocr or analysis0["needs_ocr"],
         )
 
         frames = extract_tables_chunked(
@@ -1318,6 +1409,7 @@ def convert_pdf_to_word(
     ocrmypdf_module=None,
     make_temp: Callable[[str], str] | None = None,
     max_ocr_pages: int = 40,
+    force_ocr: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
     should_cancel: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
@@ -1349,17 +1441,21 @@ def convert_pdf_to_word(
         if use_layout and converter_cls is None:
             use_layout = False
 
-        # Auto-OCR only when pages have almost no text (empty scans).
-        # Weak-but-present OCR layers are kept; text/table parsers handle them.
+        # Auto-OCR for empty / image-only scans; presets can force_ocr.
         work_path, work_indices, ocr_note = ensure_searchable_pdf(
             input_path,
             indices,
-            enable_ocr=enable_ocr and analysis["quality"] == "empty",
+            enable_ocr=enable_ocr
+            and (
+                force_ocr
+                or analysis["needs_ocr"]
+                or analysis["quality"] == "empty"
+            ),
             ocrmypdf_module=ocrmypdf_module,
             make_temp=make_temp,
             cleanup=cleanup,
             max_ocr_pages=max_ocr_pages,
-            force_when_weak=False,
+            force_when_weak=force_ocr or analysis["needs_ocr"],
         )
 
         chunks_used = 1

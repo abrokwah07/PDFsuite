@@ -607,6 +607,67 @@ def test_analyze_and_text_fallback(tmp_path):
     assert meta["sheets"] >= 1
 
 
+def test_presets_list(client: TestClient):
+    res = client.get("/api/presets")
+    assert res.status_code == 200
+    body = res.json()
+    ids = {p["id"] for p in body["presets"]}
+    assert "salary-to-excel" in ids
+    assert "scan-to-word" in ids
+
+
+def test_jobs_list_empty(client: TestClient):
+    res = client.get("/api/jobs")
+    assert res.status_code == 200
+    assert "jobs" in res.json()
+
+
+def test_audit_list(client: TestClient):
+    res = client.get("/api/audit")
+    assert res.status_code == 200
+    assert "events" in res.json()
+
+
+def test_preview_tables_endpoint(client: TestClient):
+    pdf = _make_pdf_bytes("NAME ACCOUNT AMOUNT\n1 TEST 1234567890 GHS 100.00")
+    res = client.post(
+        "/api/convert/preview-tables",
+        files={"file": ("t.pdf", pdf, "application/pdf")},
+        data={"pages": ""},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert "tables" in body
+    assert "quality" in body
+
+
+def test_batch_job_merge(client: TestClient):
+    pdf = _make_pdf_bytes("Batch A")
+    create = client.post(
+        "/api/jobs/batch",
+        files=[
+            ("files", ("a.pdf", pdf, "application/pdf")),
+            ("files", ("b.pdf", pdf, "application/pdf")),
+        ],
+        data={"action": "merge"},
+    )
+    assert create.status_code == 200, create.text
+    job_id = create.json()["job_id"]
+    import time
+
+    for _ in range(50):
+        st = client.get(f"/api/jobs/{job_id}")
+        assert st.status_code == 200
+        body = st.json()
+        if body["status"] in {"completed", "failed", "cancelled"}:
+            break
+        time.sleep(0.1)
+    assert body["status"] == "completed", body
+    dl = client.get(f"/api/jobs/{job_id}/download")
+    assert dl.status_code == 200
+    assert dl.content[:4] == b"%PDF"
+
+
 def test_merge_docx(tmp_path):
     from docx import Document
     from app.conversion import merge_docx_files, pdf_to_docx_fast

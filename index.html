@@ -45,6 +45,34 @@
             100% { background-position: -200% 0; }
         }
         #progress-overlay.hidden { display: none !important; }
+
+        /* Engine badges */
+        .engine-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.1rem 0.4rem; border-radius: 999px; font-size: 10px; font-weight: 600; border: 1px solid; }
+        .engine-ok { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        .dark .engine-ok { background: #064e3b55; color: #6ee7b7; border-color: #065f46; }
+        .engine-miss { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+        .dark .engine-miss { background: #7c2d1233; color: #fdba74; border-color: #9a3412; }
+
+        /* Command palette */
+        #cmd-palette.hidden { display: none !important; }
+        #cmd-palette-list .cmd-item.active { background: #eff6ff; }
+        .dark #cmd-palette-list .cmd-item.active { background: #1e3a5f; }
+
+        /* Convert preview table */
+        #convert-preview-wrap table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        #convert-preview-wrap th, #convert-preview-wrap td { border: 1px solid #e2e8f0; padding: 4px 6px; text-align: left; }
+        .dark #convert-preview-wrap th, .dark #convert-preview-wrap td { border-color: #334155; }
+        #convert-preview-wrap th { background: #f1f5f9; font-weight: 700; }
+        .dark #convert-preview-wrap th { background: #1e293b; }
+
+        @media print {
+            aside, #tools-container, #progress-overlay, #drag-overlay, #toast-container, #cmd-palette, #pagination-controls, .nav-btn { display: none !important; }
+            body { display: block !important; height: auto !important; overflow: visible !important; background: white !important; color: black !important; }
+            section { width: 100% !important; border: none !important; box-shadow: none !important; }
+            #preview-panel, #convert-preview-wrap { display: block !important; }
+            #convert-preview-wrap { max-height: none !important; overflow: visible !important; }
+            #convert-preview-wrap th, #convert-preview-wrap td { border-color: #999 !important; color: #000 !important; background: #fff !important; }
+        }
     </style>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232563eb'/%3E%3Cpath d='M9 8h9l5 5v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z' fill='white'/%3E%3Cpath d='M18 8v5h5' fill='none' stroke='%232563eb' stroke-width='1.5'/%3E%3C/svg%3E">
 </head>
@@ -52,6 +80,19 @@
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans h-screen flex overflow-hidden transition-colors duration-300 relative">
 
     <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
+
+    <!-- Command palette (⌘K / Ctrl+K) -->
+    <div id="cmd-palette" class="hidden fixed inset-0 z-[95] bg-slate-900/50 dark:bg-black/60 flex items-start justify-center pt-[12vh] p-4" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div class="flex items-center gap-2 px-4 border-b border-slate-200 dark:border-slate-700">
+                <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path></svg>
+                <input id="cmd-palette-input" type="search" placeholder="Jump to tool, preset, or recent job…" class="w-full py-3.5 text-sm bg-transparent outline-none text-slate-800 dark:text-slate-100" autocomplete="off">
+                <kbd class="text-[10px] text-slate-400 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5">esc</kbd>
+            </div>
+            <div id="cmd-palette-list" class="max-h-80 overflow-y-auto py-1"></div>
+            <p class="px-4 py-2 text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-800">↑↓ navigate · Enter open · Esc close</p>
+        </div>
+    </div>
 
     <!-- Global job progress overlay -->
     <div id="progress-overlay" class="hidden fixed inset-0 z-[90] bg-slate-900/40 dark:bg-black/50 flex items-center justify-center p-4" role="status" aria-live="polite" aria-busy="true">
@@ -109,10 +150,22 @@
 
         <div class="flex-grow overflow-y-auto py-4 px-3 space-y-1" id="nav-menu">
             <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3 mt-2 nav-section-label">Convert</div>
-            <button onclick="switchTool('smart-convert')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400 active-tool" data-target="tool-smart-convert">
+            <button onclick="switchTool('smart-convert')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400 active-tool" data-target="tool-smart-convert" data-tool="smart-convert" data-keywords="convert excel word pptx">
                 <div class="text-emerald-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg></div><span>Smart Convert</span>
             </button>
-            <button onclick="switchTool('compress-office')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-compress-office">
+            <button onclick="switchTool('presets')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-presets" data-tool="presets" data-keywords="salary bank hr preset workflow">
+                <div class="text-violet-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg></div><span>Workflow presets</span>
+            </button>
+            <button onclick="switchTool('batch')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-batch" data-tool="batch" data-keywords="batch folder many zip ocr merge">
+                <div class="text-cyan-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg></div><span>Batch / folder</span>
+            </button>
+            <button onclick="switchTool('history')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-history" data-tool="history" data-keywords="history jobs download past">
+                <div class="text-amber-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div><span>Job history</span>
+            </button>
+            <button onclick="switchTool('audit')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-audit" data-tool="audit" data-keywords="audit log activity">
+                <div class="text-slate-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg></div><span>Audit log</span>
+            </button>
+            <button onclick="switchTool('compress-office')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400" data-target="tool-compress-office" data-tool="compress-office">
                 <div class="text-rose-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg></div>
                 <span>Shrink Office files</span>
             </button>
@@ -163,6 +216,8 @@
                 <span id="app-version" class="font-mono text-slate-400 dark:text-slate-500">v—</span>
             </div>
             <p id="status-features" class="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed truncate" title="">Private · on-device processing</p>
+            <div id="engine-badges" class="mt-2 flex flex-wrap gap-1"></div>
+            <p class="text-[10px] text-slate-400 dark:text-slate-600 mt-2">⌘K / Ctrl+K command palette · / search</p>
         </div>
     </aside>
 
@@ -203,9 +258,75 @@
                     </div>
 
                     <p id="smart-error" class="hidden text-xs text-red-500 font-medium"></p>
-                    <p class="text-[11px] text-slate-400 dark:text-slate-500">Supported: PDF, Word, Excel, PowerPoint, OpenDocument. Scanned PDFs auto-detect tables (salary schedules, etc.). Jobs show progress and can be cancelled.</p>
+                    <div id="convert-preview-wrap" class="hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <p class="text-xs font-bold text-slate-700 dark:text-slate-200">Table preview</p>
+                            <div class="flex gap-2">
+                                <button type="button" id="smart-preview-btn" class="text-[11px] font-semibold text-emerald-600 hover:underline">Refresh</button>
+                                <button type="button" onclick="window.print()" class="text-[11px] font-semibold text-slate-500 hover:underline">Print</button>
+                            </div>
+                        </div>
+                        <p id="convert-preview-meta" class="text-[10px] text-slate-400"></p>
+                        <div id="convert-preview-body" class="max-h-48 overflow-auto"></div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">Supported: PDF, Word, Excel, PowerPoint, OpenDocument. Scanned PDFs auto-detect tables. Preview rows before Excel download.</p>
                 </div>
-                <button id="smart-convert-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert</button>
+                <div class="space-y-2">
+                    <button id="smart-preview-excel-btn" type="button" class="w-full border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-medium py-2.5 px-4 rounded-xl transition-colors disabled:opacity-50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30" disabled>Preview tables</button>
+                    <button id="smart-convert-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-xl transition-colors disabled:opacity-50" disabled>Convert</button>
+                </div>
+            </div>
+
+            <!-- Workflow presets -->
+            <div id="tool-presets" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Workflow presets</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">One-click bank / HR pipelines using the v1.5 convert engine.</p>
+                <div class="mb-4">
+                    <input type="file" id="preset-input" accept="application/pdf,.pdf" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-50 dark:file:bg-violet-900/20 file:text-violet-700 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="triggerFileSelect(this)">
+                </div>
+                <div id="preset-list" class="flex-grow overflow-y-auto space-y-2 mb-4"></div>
+                <p class="text-[11px] text-slate-400">Pick a preset after selecting PDF(s). Multi-file runs use the batch engine and return a zip when needed.</p>
+            </div>
+
+            <!-- Batch / folder -->
+            <div id="tool-batch" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Batch / folder</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Drop many PDFs (or a folder). Get a zip of results — or one merged PDF.</p>
+                <div class="mb-4 space-y-3 flex-grow">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">PDFs (multi-select)</label>
+                    <input type="file" id="batch-input" accept="application/pdf,.pdf" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 dark:file:bg-cyan-900/20 file:text-cyan-700 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-2" onchange="onBatchFiles(this)">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Or whole folder</label>
+                    <input type="file" id="batch-folder-input" accept="application/pdf,.pdf" webkitdirectory directory multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 dark:file:bg-cyan-900/20 file:text-cyan-700 border border-slate-200 dark:border-slate-700 rounded-lg p-1" onchange="onBatchFiles(this)">
+                    <p class="text-[11px] text-slate-400 mt-1">Non-PDF files in a folder are skipped automatically.</p>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Action</label>
+                    <select id="batch-action" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-lg px-3 py-2.5">
+                        <option value="to-excel">PDF → Excel (zip)</option>
+                        <option value="to-word">PDF → Word (zip)</option>
+                        <option value="ocr">OCR searchable PDF (zip)</option>
+                        <option value="word-and-excel">Word + Excel pack (zip)</option>
+                        <option value="merge">Merge into one PDF</option>
+                    </select>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Pages (optional)</label>
+                    <input type="text" id="batch-pages" placeholder="Empty = all pages" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-lg px-3 py-2.5">
+                    <div id="batch-file-list" class="text-xs text-slate-500 max-h-40 overflow-auto rounded-lg border border-slate-100 dark:border-slate-800 p-2 hidden"></div>
+                </div>
+                <button id="batch-btn" class="w-full bg-slate-900 dark:bg-slate-800 hover:bg-cyan-600 text-white font-medium py-3 px-4 rounded-xl disabled:opacity-50" disabled>Run batch</button>
+            </div>
+
+            <!-- Job history -->
+            <div id="tool-history" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Job history</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Recent jobs on this server. Re-download while the result is still on disk.</p>
+                <button type="button" id="history-refresh-btn" class="mb-3 text-sm font-semibold text-blue-600 hover:underline self-start">Refresh</button>
+                <div id="history-list" class="flex-grow overflow-y-auto space-y-2 text-sm"></div>
+            </div>
+
+            <!-- Audit log -->
+            <div id="tool-audit" class="tool-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Audit log</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Local activity trail (filenames + actions only). Stored on this machine.</p>
+                <button type="button" id="audit-refresh-btn" class="mb-3 text-sm font-semibold text-blue-600 hover:underline self-start">Refresh</button>
+                <div id="audit-list" class="flex-grow overflow-y-auto space-y-1.5 text-xs font-mono"></div>
             </div>
 
             <div id="tool-manipulate" class="tool-section hidden h-full flex flex-col">
@@ -470,11 +591,22 @@
                 if (readyRes.ok) {
                     const r = await readyRes.json();
                     const f = r.features || {};
+                    const engines = r.engines || {};
                     const missing = [];
                     if (f.ghostscript === false) missing.push('Ghostscript');
                     if (f.libreoffice === false) missing.push('LibreOffice');
                     if (f.ocr === false) missing.push('OCR');
                     if (f.edit === false) missing.push('Edit engine');
+                    const badges = document.getElementById('engine-badges');
+                    if (badges) {
+                        const order = ['ghostscript', 'tesseract', 'libreoffice'];
+                        badges.innerHTML = order.map((key) => {
+                            const eng = engines[key] || {};
+                            const ok = !!eng.ok;
+                            const label = eng.label || key;
+                            return `<span class="engine-badge ${ok ? 'engine-ok' : 'engine-miss'}" title="${escapeHtml(eng.path || (ok ? 'available' : 'not found'))}">${ok ? '●' : '○'} ${escapeHtml(label)}</span>`;
+                        }).join('');
+                    }
                     if (missing.length) {
                         dot.className = 'inline-block w-2 h-2 rounded-full bg-amber-400';
                         text.textContent = 'Partial';
@@ -488,6 +620,7 @@
                             ? `Local · up to ${lim.max_upload_mb} MB / file`
                             : 'Local · on-device processing';
                     }
+                    window.__pdfSuiteReady = r;
                 } else {
                     dot.className = 'inline-block w-2 h-2 rounded-full bg-red-500';
                     text.textContent = 'Degraded';
@@ -526,7 +659,7 @@
             });
             // Focus search with "/"
             document.addEventListener('keydown', (e) => {
-                if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+                if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA' && document.activeElement?.tagName !== 'SELECT') {
                     e.preventDefault();
                     toolSearch.focus();
                 }
@@ -534,6 +667,128 @@
         }
 
         loadServerStatus();
+
+        // --- Command palette (⌘K / Ctrl+K) ---
+        const CmdPalette = (() => {
+            const root = document.getElementById('cmd-palette');
+            const input = document.getElementById('cmd-palette-input');
+            const list = document.getElementById('cmd-palette-list');
+            let items = [];
+            let active = 0;
+
+            function toolItems() {
+                return Array.from(document.querySelectorAll('#nav-menu .nav-btn')).map((btn) => ({
+                    type: 'tool',
+                    id: btn.dataset.tool || '',
+                    label: (btn.querySelector('span')?.textContent || btn.textContent || '').trim(),
+                    keywords: (btn.dataset.keywords || '') + ' ' + (btn.textContent || ''),
+                    run: () => {
+                        const tool = (btn.getAttribute('onclick') || '').match(/switchTool\('([^']+)'\)/);
+                        if (tool) switchTool(tool[1]);
+                        else if (btn.dataset.tool) switchTool(btn.dataset.tool);
+                    },
+                }));
+            }
+
+            async function recentJobs() {
+                try {
+                    const res = await fetch('/api/jobs?limit=8');
+                    if (!res.ok) return [];
+                    const data = await res.json();
+                    return (data.jobs || []).map((j) => ({
+                        type: 'job',
+                        id: j.id,
+                        label: `${j.kind} · ${j.status}${j.result_name ? ' · ' + j.result_name : ''}`,
+                        keywords: `${j.kind} ${j.status} ${j.result_name || ''} history`,
+                        run: async () => {
+                            close();
+                            switchTool('history');
+                            await loadJobHistory();
+                            if (j.downloadable) {
+                                const dl = await fetch(`/api/jobs/${j.id}/download`);
+                                if (dl.ok) {
+                                    const blob = await dl.blob();
+                                    triggerDownload(blob, j.result_name || 'download.bin');
+                                }
+                            }
+                        },
+                    }));
+                } catch (_) {
+                    return [];
+                }
+            }
+
+            function render(filter = '') {
+                const q = filter.trim().toLowerCase();
+                const filtered = items.filter((it) => !q || (it.label + ' ' + it.keywords).toLowerCase().includes(q));
+                active = 0;
+                if (!filtered.length) {
+                    list.innerHTML = '<p class="px-4 py-6 text-sm text-slate-400 text-center">No matches</p>';
+                    return;
+                }
+                list.innerHTML = filtered.map((it, i) => `
+                    <button type="button" class="cmd-item w-full text-left px-4 py-2.5 text-sm flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 ${i === 0 ? 'active' : ''}" data-idx="${i}">
+                        <span class="text-slate-800 dark:text-slate-100 truncate">${escapeHtml(it.label)}</span>
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400 shrink-0">${escapeHtml(it.type)}</span>
+                    </button>
+                `).join('');
+                list.querySelectorAll('.cmd-item').forEach((el) => {
+                    el.addEventListener('click', () => {
+                        const idx = Number(el.dataset.idx);
+                        filtered[idx]?.run();
+                        close();
+                    });
+                });
+                list._filtered = filtered;
+            }
+
+            function setActive(n) {
+                const filtered = list._filtered || [];
+                if (!filtered.length) return;
+                active = (n + filtered.length) % filtered.length;
+                list.querySelectorAll('.cmd-item').forEach((el, i) => {
+                    el.classList.toggle('active', i === active);
+                    if (i === active) el.scrollIntoView({ block: 'nearest' });
+                });
+            }
+
+            async function open() {
+                items = [...toolItems(), ...(await recentJobs())];
+                root.classList.remove('hidden');
+                input.value = '';
+                render('');
+                input.focus();
+            }
+
+            function close() {
+                root.classList.add('hidden');
+            }
+
+            input?.addEventListener('input', () => render(input.value));
+            input?.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+                else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const filtered = list._filtered || [];
+                    filtered[active]?.run();
+                    close();
+                } else if (e.key === 'Escape') {
+                    close();
+                }
+            });
+            root?.addEventListener('click', (e) => { if (e.target === root) close(); });
+
+            document.addEventListener('keydown', (e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                    e.preventDefault();
+                    if (root.classList.contains('hidden')) open();
+                    else close();
+                }
+            });
+
+            return { open, close };
+        })();
 
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
@@ -608,6 +863,9 @@
 
         // --- SIDEBAR LOGIC ---
         function switchTool(toolName) {
+            if (toolName === 'history') setTimeout(() => loadJobHistory(), 50);
+            if (toolName === 'audit') setTimeout(() => loadAuditLog(), 50);
+            if (toolName === 'presets') setTimeout(() => loadPresetsUI(), 50);
             currentActiveTool = toolName;
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('bg-slate-100', 'dark:bg-slate-800/50', 'active-tool'));
             document.querySelector(`[data-target="tool-${toolName}"]`).classList.add('bg-slate-100', 'dark:bg-slate-800/50', 'active-tool');
@@ -1223,6 +1481,9 @@
                 const label = (job.meta && job.meta.pages_label) || job.message || '';
                 showToast(label ? `${defaultText} done (${label})` : `${defaultText} completed.`, 'success');
                 resetPreview();
+                if (typeof loadJobHistory === 'function' && currentActiveTool === 'history') {
+                    loadJobHistory();
+                }
             } catch (error) {
                 ProgressUI.finish(false);
                 showToast(error.message || 'Connection error.', 'error');
@@ -1448,6 +1709,224 @@
             } else {
                 showToast('Unknown conversion route.', 'error');
             }
+        });
+
+        // --- Batch / presets / history / audit / table preview ---
+        let batchFiles = [];
+
+        function onBatchFiles(inputEl) {
+            const all = Array.from(inputEl.files || []);
+            batchFiles = all.filter((f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+            const list = document.getElementById('batch-file-list');
+            const btn = document.getElementById('batch-btn');
+            if (!batchFiles.length) {
+                list.classList.add('hidden');
+                list.innerHTML = '';
+                btn.disabled = true;
+                if (all.length) showToast('No PDFs found in selection.', 'error');
+                return;
+            }
+            currentUploadedFiles = batchFiles;
+            list.classList.remove('hidden');
+            list.innerHTML = `<p class="font-semibold text-slate-600 dark:text-slate-300 mb-1">${batchFiles.length} PDF(s)</p>` +
+                batchFiles.slice(0, 30).map((f) => `<div class="truncate">• ${escapeHtml(f.name)}</div>`).join('') +
+                (batchFiles.length > 30 ? `<div class="text-slate-400">…and ${batchFiles.length - 30} more</div>` : '');
+            btn.disabled = false;
+        }
+
+        document.getElementById('batch-btn')?.addEventListener('click', () => {
+            if (!batchFiles.length) {
+                showToast('Choose PDF files or a folder first.', 'error');
+                return;
+            }
+            const formData = new FormData();
+            batchFiles.forEach((f) => formData.append('files', f));
+            formData.append('action', document.getElementById('batch-action').value);
+            formData.append('pages', document.getElementById('batch-pages').value || '');
+            formData.append('mode', 'auto');
+            currentUploadedFiles = batchFiles;
+            processJob(
+                '/api/jobs/batch',
+                formData,
+                document.getElementById('batch-btn'),
+                'Batch job',
+                'Running batch…',
+                'batch_results.zip'
+            );
+        });
+
+        async function loadPresetsUI() {
+            const host = document.getElementById('preset-list');
+            if (!host) return;
+            try {
+                const res = await fetch('/api/presets');
+                if (!res.ok) throw new Error('Failed to load presets');
+                const data = await res.json();
+                const presets = data.presets || [];
+                host.innerHTML = presets.map((p) => `
+                    <button type="button" class="preset-run w-full text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-violet-400 dark:hover:border-violet-500 px-3 py-3 transition-colors" data-preset-id="${escapeHtml(p.id)}">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-violet-500">${escapeHtml(p.category || '')}</p>
+                        <p class="text-sm font-bold text-slate-800 dark:text-slate-100 mt-0.5">${escapeHtml(p.name)}</p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">${escapeHtml(p.description || '')}</p>
+                    </button>
+                `).join('');
+                host.querySelectorAll('.preset-run').forEach((btn) => {
+                    btn.addEventListener('click', () => runPreset(btn.dataset.presetId));
+                });
+            } catch (err) {
+                host.innerHTML = `<p class="text-sm text-red-500">${escapeHtml(err.message || 'Could not load presets')}</p>`;
+            }
+        }
+
+        function runPreset(presetId) {
+            const input = document.getElementById('preset-input');
+            const files = Array.from(input?.files || []).filter((f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+            if (!files.length) {
+                showToast('Select one or more PDFs first.', 'error');
+                return;
+            }
+            const formData = new FormData();
+            files.forEach((f) => formData.append('files', f));
+            formData.append('preset_id', presetId);
+            formData.append('pages', '');
+            currentUploadedFiles = files;
+            const runBtn = document.getElementById('batch-btn') || document.getElementById('smart-convert-btn');
+            processJob(
+                '/api/jobs/preset',
+                formData,
+                runBtn,
+                `Preset: ${presetId}`,
+                'Running preset…',
+                'preset_result'
+            );
+        }
+
+        async function loadJobHistory() {
+            const host = document.getElementById('history-list');
+            if (!host) return;
+            host.innerHTML = '<p class="text-slate-400 text-sm">Loading…</p>';
+            try {
+                const res = await fetch('/api/jobs?limit=40');
+                if (!res.ok) throw new Error('Could not load history');
+                const data = await res.json();
+                const jobs = data.jobs || [];
+                if (!jobs.length) {
+                    host.innerHTML = '<p class="text-slate-400 text-sm">No jobs yet. Run a conversion to see history.</p>';
+                    return;
+                }
+                host.innerHTML = jobs.map((j) => {
+                    const when = j.updated_at ? new Date(j.updated_at * 1000).toLocaleString() : '';
+                    const statusColor = j.status === 'completed' ? 'text-emerald-600' : j.status === 'failed' ? 'text-red-500' : j.status === 'running' ? 'text-blue-500' : 'text-slate-500';
+                    const dl = j.downloadable
+                        ? `<button type="button" class="history-dl text-xs font-semibold text-blue-600 hover:underline" data-id="${j.id}" data-name="${escapeHtml(j.result_name || 'download.bin')}">Download</button>`
+                        : '<span class="text-[10px] text-slate-400">—</span>';
+                    return `<div class="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="font-semibold text-slate-800 dark:text-slate-100 truncate">${escapeHtml(j.kind)}</p>
+                            <p class="text-[11px] text-slate-500 truncate">${escapeHtml(j.result_name || j.message || '')}</p>
+                            <p class="text-[10px] ${statusColor}">${escapeHtml(j.status)} · ${escapeHtml(when)}</p>
+                        </div>
+                        <div class="shrink-0 pt-1">${dl}</div>
+                    </div>`;
+                }).join('');
+                host.querySelectorAll('.history-dl').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const dl = await fetch(`/api/jobs/${btn.dataset.id}/download`);
+                        if (!dl.ok) {
+                            showToast(await readErrorDetail(dl), 'error');
+                            return;
+                        }
+                        const blob = await dl.blob();
+                        triggerDownload(blob, btn.dataset.name || 'download.bin');
+                        showToast('Download started.', 'success');
+                    });
+                });
+            } catch (err) {
+                host.innerHTML = `<p class="text-red-500 text-sm">${escapeHtml(err.message || 'Error')}</p>`;
+            }
+        }
+
+        async function loadAuditLog() {
+            const host = document.getElementById('audit-list');
+            if (!host) return;
+            host.innerHTML = '<p class="text-slate-400">Loading…</p>';
+            try {
+                const res = await fetch('/api/audit?limit=80');
+                if (!res.ok) throw new Error('Could not load audit log');
+                const data = await res.json();
+                const events = data.events || [];
+                if (!events.length) {
+                    host.innerHTML = '<p class="text-slate-400">No events yet.</p>';
+                    return;
+                }
+                host.innerHTML = events.map((e) => {
+                    const when = e.ts ? new Date(e.ts * 1000).toLocaleString() : '';
+                    return `<div class="rounded border border-slate-100 dark:border-slate-800 px-2 py-1.5 text-slate-600 dark:text-slate-300">
+                        <span class="text-slate-400">${escapeHtml(when)}</span>
+                        <span class="text-blue-600 dark:text-blue-400 ml-1">${escapeHtml(e.action)}</span>
+                        <span class="ml-1">${escapeHtml(e.status || '')}</span>
+                        <div class="truncate text-slate-500">${escapeHtml(e.filename || '')} ${escapeHtml(e.detail || '')}</div>
+                    </div>`;
+                }).join('');
+            } catch (err) {
+                host.innerHTML = `<p class="text-red-500">${escapeHtml(err.message || 'Error')}</p>`;
+            }
+        }
+
+        document.getElementById('history-refresh-btn')?.addEventListener('click', () => loadJobHistory());
+        document.getElementById('audit-refresh-btn')?.addEventListener('click', () => loadAuditLog());
+
+        async function runTablePreview() {
+            const file = currentUploadedFiles[0] || document.getElementById('smart-convert-input')?.files?.[0];
+            if (!file) {
+                showToast('Choose a PDF first.', 'error');
+                return;
+            }
+            if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+                showToast('Table preview works on PDFs.', 'error');
+                return;
+            }
+            const wrap = document.getElementById('convert-preview-wrap');
+            const body = document.getElementById('convert-preview-body');
+            const meta = document.getElementById('convert-preview-meta');
+            wrap.classList.remove('hidden');
+            body.innerHTML = '<p class="text-slate-400 text-xs">Extracting tables…</p>';
+            meta.textContent = '';
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('pages', document.getElementById('smart-convert-pages')?.value || '');
+                const res = await fetch('/api/convert/preview-tables', { method: 'POST', body: formData });
+                if (!res.ok) {
+                    body.innerHTML = `<p class="text-red-500 text-xs">${escapeHtml(await readErrorDetail(res))}</p>`;
+                    return;
+                }
+                const data = await res.json();
+                meta.textContent = `quality=${data.quality || '?'} · engine=${data.engine || '?'} · ${data.table_count || 0} table(s)`;
+                if (!data.tables || !data.tables.length) {
+                    body.innerHTML = '<p class="text-slate-400 text-xs">No tables found. Try OCR first or pick pages with a schedule.</p>';
+                    return;
+                }
+                body.innerHTML = data.tables.map((t, ti) => {
+                    const head = (t.headers || []).map((h) => `<th>${escapeHtml(h)}</th>`).join('');
+                    const rows = (t.rows || []).map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('');
+                    return `<div class="mb-3"><p class="text-[10px] font-semibold text-slate-500 mb-1">Table ${ti + 1} · ${t.row_count} rows${t.truncated ? ' (preview truncated)' : ''}</p><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+                }).join('');
+            } catch (err) {
+                body.innerHTML = `<p class="text-red-500 text-xs">${escapeHtml(err.message || 'Preview failed')}</p>`;
+            }
+        }
+
+        document.getElementById('smart-preview-excel-btn')?.addEventListener('click', () => runTablePreview());
+        document.getElementById('smart-preview-btn')?.addEventListener('click', () => runTablePreview());
+
+        // Enable preview button when PDF selected for smart convert
+        const _origOnSmart = window.onSmartConvertFile;
+        document.getElementById('smart-convert-input')?.addEventListener('change', () => {
+            const f = document.getElementById('smart-convert-input')?.files?.[0];
+            const isPdf = f && (/\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+            const prevBtn = document.getElementById('smart-preview-excel-btn');
+            if (prevBtn) prevBtn.disabled = !isPdf;
         });
 
         document.getElementById('manipulate-btn').addEventListener('click', () => {

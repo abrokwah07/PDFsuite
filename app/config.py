@@ -51,7 +51,7 @@ class Settings:
     """Enterprise-oriented defaults for Local PDF Suite."""
 
     app_name: str = "Local PDF Suite"
-    app_version: str = "1.4.0"
+    app_version: str = "1.5.0"
     environment: str = "production"
 
     # Network
@@ -67,6 +67,11 @@ class Settings:
     max_ocr_pages: int = 200
     # Auto-OCR during convert when PDF is scanned / weak text (per job)
     max_auto_ocr_pages: int = 40
+    # Job history / batch
+    job_history_ttl_seconds: int = 7200  # keep results ~2h for re-download
+    job_history_max: int = 100
+    max_batch_files: int = 40
+    audit_max_entries: int = 2000
     # Full-document auto conversion: process in chunks, merge to one file
     word_chunk_pages: int = 40  # layout chunks
     excel_chunk_pages: int = 50
@@ -125,7 +130,7 @@ def get_settings() -> Settings:
 
     return Settings(
         app_name=os.getenv("APP_NAME", "Local PDF Suite"),
-        app_version=os.getenv("APP_VERSION", "1.4.0"),
+        app_version=os.getenv("APP_VERSION", "1.5.0"),
         environment=os.getenv("APP_ENV", "production"),
         host=os.getenv("HOST", default_host),
         port=_env_int("PORT", 8000),
@@ -136,6 +141,10 @@ def get_settings() -> Settings:
         max_total_preview_pages=_env_int("MAX_TOTAL_PREVIEW_PAGES", 500),
         max_ocr_pages=_env_int("MAX_OCR_PAGES", 200),
         max_auto_ocr_pages=_env_int("MAX_AUTO_OCR_PAGES", 40),
+        job_history_ttl_seconds=_env_int("JOB_HISTORY_TTL_SECONDS", 7200),
+        job_history_max=_env_int("JOB_HISTORY_MAX", 100),
+        max_batch_files=_env_int("MAX_BATCH_FILES", 40),
+        audit_max_entries=_env_int("AUDIT_MAX_ENTRIES", 2000),
         word_chunk_pages=_env_int("WORD_CHUNK_PAGES", 40),
         excel_chunk_pages=_env_int("EXCEL_CHUNK_PAGES", 50),
         max_word_total_pages=_env_int("MAX_WORD_TOTAL_PAGES", 8000),
