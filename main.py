@@ -108,6 +108,27 @@ except ImportError:  # pragma: no cover
 
 logger = logging.getLogger("pdfsuite")
 
+PDF_COMPRESSION_PROFILES = {
+    "low": {
+        "pdf_settings": "/printer",
+        "resolution": 200,
+        "mono_resolution": 300,
+        "jpeg_quality": 86,
+    },
+    "medium": {
+        "pdf_settings": "/ebook",
+        "resolution": 144,
+        "mono_resolution": 300,
+        "jpeg_quality": 72,
+    },
+    "high": {
+        "pdf_settings": "/screen",
+        "resolution": 96,
+        "mono_resolution": 200,
+        "jpeg_quality": 55,
+    },
+}
+
 
 def _configure_logging(settings: Settings) -> None:
     logging.basicConfig(
@@ -117,7 +138,21 @@ def _configure_logging(settings: Settings) -> None:
 
 
 def _which(cmd: str) -> str | None:
-    return shutil.which(cmd)
+    found = shutil.which(cmd)
+    if found:
+        return found
+    extra_dirs = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/Applications/LibreOffice.app/Contents/MacOS",
+        "/usr/bin",
+        "/bin",
+    ]
+    for d in extra_dirs:
+        p = Path(d) / cmd
+        if p.is_file() and os.access(p, os.X_OK):
+            return str(p)
+    return None
 
 
 def _settings(request: Request) -> Settings:
@@ -126,6 +161,83 @@ def _settings(request: Request) -> Settings:
 
 def _limiter(request: Request) -> JobLimiter:
     return request.app.state.job_limiter
+
+
+def _normalize_pdf_compression_level(level: str | None) -> str:
+    level_norm = (level or "medium").strip().lower()
+    if level_norm not in PDF_COMPRESSION_PROFILES:
+        return "medium"
+    return level_norm
+
+
+def _pdf_compression_command(
+    gs_path: str,
+    input_path: str,
+    output_path: str,
+    level: str,
+) -> list[str]:
+    profile = PDF_COMPRESSION_PROFILES[_normalize_pdf_compression_level(level)]
+    resolution = profile["resolution"]
+    mono_resolution = profile["mono_resolution"]
+    command = [
+        gs_path,
+        "-dSAFER",
+        "-sDEVICE=pdfwrite",
+        "-dCompatibilityLevel=1.4",
+        f"-dPDFSETTINGS={profile['pdf_settings']}",
+        "-dNOPAUSE",
+        "-dQUIET",
+        "-dBATCH",
+        "-dDetectDuplicateImages=true",
+        "-dCompressFonts=true",
+        "-dSubsetFonts=true",
+        "-dEmbedAllFonts=true",
+        "-dDownsampleColorImages=true",
+        "-dDownsampleGrayImages=true",
+        "-dDownsampleMonoImages=true",
+        "-dColorImageDownsampleType=/Bicubic",
+        "-dGrayImageDownsampleType=/Bicubic",
+        "-dMonoImageDownsampleType=/Subsample",
+        f"-dColorImageResolution={resolution}",
+        f"-dGrayImageResolution={resolution}",
+        f"-dMonoImageResolution={mono_resolution}",
+        "-dColorImageDownsampleThreshold=1.0",
+        "-dGrayImageDownsampleThreshold=1.0",
+        "-dMonoImageDownsampleThreshold=1.0",
+        "-dAutoFilterColorImages=true",
+        "-dAutoFilterGrayImages=true",
+        "-dPassThroughJPEGImages=false",
+        "-dPassThroughJPXImages=false",
+        f"-dJPEGQ={profile['jpeg_quality']}",
+    ]
+    command.extend([f"-sOutputFile={output_path}", input_path])
+    return command
+
+
+def _pdf_compression_stats(
+    original_bytes: int,
+    compressed_bytes: int,
+    level: str,
+) -> dict[str, int | float | str]:
+    saved_bytes = max(0, original_bytes - compressed_bytes)
+    saved_percent = round((saved_bytes / original_bytes) * 100, 1) if original_bytes else 0.0
+    return {
+        "original_bytes": original_bytes,
+        "compressed_bytes": compressed_bytes,
+        "saved_bytes": saved_bytes,
+        "saved_percent": saved_percent,
+        "level": level,
+        "status": "compressed" if saved_bytes > 0 else "unchanged",
+    }
+
+
+def _add_pdf_compression_headers(response, stats: dict[str, int | float | str]) -> None:
+    response.headers["X-Original-Bytes"] = str(stats["original_bytes"])
+    response.headers["X-Compressed-Bytes"] = str(stats["compressed_bytes"])
+    response.headers["X-Saved-Bytes"] = str(stats["saved_bytes"])
+    response.headers["X-Saved-Percent"] = str(stats["saved_percent"])
+    response.headers["X-Compression-Level"] = str(stats["level"])
+    response.headers["X-Compression-Status"] = str(stats["status"])
 
 
 @asynccontextmanager
@@ -211,6 +323,12 @@ def create_app() -> FastAPI:
             "X-Convert-Detail",
             "X-Chunks",
             "X-Pages-Label",
+            "X-Original-Bytes",
+            "X-Compressed-Bytes",
+            "X-Saved-Bytes",
+            "X-Saved-Percent",
+            "X-Compression-Level",
+            "X-Compression-Status",
         ],
     )
     app.add_middleware(RequestContextMiddleware)
@@ -1692,13 +1810,8 @@ def create_app() -> FastAPI:
         if not settings.enable_ghostscript or not request.app.state.gs_path:
             raise HTTPException(status_code=503, detail="Ghostscript is not available.")
 
-        gs_settings = {
-            "high": "/screen",
-            "medium": "/ebook",
-            "low": "/printer",
-        }
-        pdf_setting = gs_settings.get(level.lower(), "/ebook")
-        processed: list[tuple[str, str]] = []
+        level_norm = _normalize_pdf_compression_level(level)
+        processed: list[tuple[str, str, dict[str, int | float | str]]] = []
         inputs: list[str] = []
 
         try:
@@ -1709,56 +1822,90 @@ def create_app() -> FastAPI:
                     )
                     input_path = write_bytes(data, ".pdf", settings)
                     inputs.append(input_path)
+
+                    try:
+                        reader = PdfReader(input_path)
+                        if reader.is_encrypted:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"'{name}' is password-protected. Unlock it first using the Unlock PDF tool.",
+                            )
+                    except HTTPException:
+                        raise
+                    except Exception:
+                        pass
+
                     output_path = make_temp_path(".pdf", settings)
 
                     run_subprocess(
-                        [
+                        _pdf_compression_command(
                             request.app.state.gs_path,
-                            "-sDEVICE=pdfwrite",
-                            "-dCompatibilityLevel=1.4",
-                            f"-dPDFSETTINGS={pdf_setting}",
-                            "-dNOPAUSE",
-                            "-dQUIET",
-                            "-dBATCH",
-                            f"-sOutputFile={output_path}",
                             input_path,
-                        ],
+                            output_path,
+                            level_norm,
+                        ),
                         settings,
                         label="Ghostscript compression",
                     )
-                    processed.append((name, output_path))
+                    original_bytes = len(data)
+                    compressed_bytes = Path(output_path).stat().st_size
+                    if compressed_bytes >= original_bytes:
+                        safe_unlink(output_path)
+                        output_path = input_path
+                        compressed_bytes = original_bytes
+                    stats = _pdf_compression_stats(
+                        original_bytes,
+                        compressed_bytes,
+                        level_norm,
+                    )
+                    processed.append((name, output_path, stats))
+                    logger.info(
+                        "pdf compress %s level=%s: %s → %s bytes (%.1f%% saved)",
+                        name,
+                        level_norm,
+                        stats["original_bytes"],
+                        stats["compressed_bytes"],
+                        stats["saved_percent"],
+                    )
 
             if len(processed) == 1:
-                orig_name, out_path = processed[0]
+                orig_name, out_path, stats = processed[0]
                 schedule_cleanup(background, *inputs)
-                return file_response(
+                resp = file_response(
                     out_path,
                     filename=f"compressed_{orig_name}",
                     media_type="application/pdf",
                     background=background,
                 )
+                _add_pdf_compression_headers(resp, stats)
+                return resp
 
             zip_path = make_temp_path(".zip", settings)
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-                for orig_name, out_path in processed:
+                for orig_name, out_path, _stats in processed:
                     zipf.write(out_path, arcname=f"compressed_{orig_name}")
-            schedule_cleanup(background, *inputs, *[p for _, p in processed])
-            return file_response(
+            total_before = sum(int(s["original_bytes"]) for _, _, s in processed)
+            total_after = sum(int(s["compressed_bytes"]) for _, _, s in processed)
+            stats = _pdf_compression_stats(total_before, total_after, level_norm)
+            schedule_cleanup(background, *inputs, *[p for _, p, _ in processed])
+            resp = file_response(
                 zip_path,
                 filename="compressed_batch.zip",
                 media_type="application/zip",
                 background=background,
             )
+            _add_pdf_compression_headers(resp, stats)
+            return resp
         except HTTPException:
             for path in inputs:
                 safe_unlink(path)
-            for _, path in processed:
+            for _, path, _stats in processed:
                 safe_unlink(path)
             raise
         except Exception as exc:
             for path in inputs:
                 safe_unlink(path)
-            for _, path in processed:
+            for _, path, _stats in processed:
                 safe_unlink(path)
             logger.exception("compress failed")
             raise HTTPException(status_code=500, detail="Failed to compress files.") from exc

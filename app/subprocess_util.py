@@ -39,6 +39,13 @@ def run_subprocess(
             detail=f"{label} is not installed on this server.",
         ) from exc
     except subprocess.CalledProcessError as exc:
-        stderr = (exc.stderr or "")[:500]
-        logger.error("%s failed: %s", label, stderr)
-        raise HTTPException(status_code=500, detail=f"{label} failed.") from exc
+        stderr = (exc.stderr or "").strip()
+        logger.error("%s failed: %s", label, stderr[:500])
+        if "password" in stderr.lower() or "encrypted" in stderr.lower():
+            detail = f"{label} failed: The PDF is password-protected. Unlock it first."
+        elif stderr:
+            first_err = stderr.splitlines()[-1] if stderr.splitlines() else stderr
+            detail = f"{label} failed: {first_err[:200]}"
+        else:
+            detail = f"{label} failed."
+        raise HTTPException(status_code=500, detail=detail) from exc
