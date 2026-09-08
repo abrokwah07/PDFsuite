@@ -1,9 +1,10 @@
 """
 Aggressive Office (OOXML) compression.
 
-Images dominate .docx/.pptx size. We resize, strip metadata, re-encode as JPEG
-(where safe), update Content_Types + relationships when extensions change, and
-write the package with maximum DEFLATE compression.
+Images dominate many Office files. Excel workbooks can also accumulate tens of
+thousands of empty text boxes. We remove drawing parts made entirely of those
+empty boxes, resize and re-encode images where safe, then repack with maximum
+DEFLATE compression.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import re
 import zipfile
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree as ET
 
 from PIL import Image
 
@@ -31,6 +33,127 @@ LEVELS: dict[str, dict[str, Any]] = {
     "medium": {"quality": 45, "max_dim": 1200, "min_bytes_to_touch": 4_000},
     "high": {"quality": 28, "max_dim": 800, "min_bytes_to_touch": 2_000},
 }
+
+_DRAWING_NS = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+_DRAWING_TEXT_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+_OFFICE_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+_PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+_SPREADSHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+_MIN_EMPTY_TEXT_BOXES = 100
+
+
+def _is_redundant_empty_textbox_drawing(raw: bytes) -> tuple[bool, int]:
+    """Identify an Excel drawing part made only of many empty text boxes."""
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return False, 0
+
+    anchors = list(root)
+    if len(anchors) < _MIN_EMPTY_TEXT_BOXES:
+        return False, 0
+
+    shape_count = 0
+    for anchor in anchors:
+        shapes = anchor.findall(f"{{{_DRAWING_NS}}}sp")
+        if len(shapes) != 1:
+            return False, 0
+        shape = shapes[0]
+        shape_count += 1
+
+        shape_props = shape.find(
+            f"{{{_DRAWING_NS}}}nvSpPr/{{{_DRAWING_NS}}}cNvSpPr"
+        )
+        if shape_props is None or shape_props.get("txBox") != "1":
+            return False, 0
+
+        text_runs = shape.findall(f".//{{{_DRAWING_TEXT_NS}}}t")
+        if any((run.text or "").strip() for run in text_runs):
+            return False, 0
+
+    return True, shape_count
+
+
+def _owner_part_for_rels(rels_name: str) -> str | None:
+    rels_path = Path(rels_name)
+    if rels_path.parent.name != "_rels" or not rels_path.name.endswith(".rels"):
+        return None
+    return str(rels_path.parent.parent / rels_path.name.removesuffix(".rels"))
+
+
+def _remove_redundant_excel_drawings(
+    members: list[tuple[str, bytes, bool]],
+) -> tuple[list[tuple[str, bytes, bool]], int, int]:
+    """Remove only Excel drawing parts proven to contain mass empty text boxes."""
+    redundant: dict[str, int] = {}
+    for name, raw, _is_xml in members:
+        if re.fullmatch(r"xl/drawings/drawing\d+\.xml", name):
+            is_redundant, count = _is_redundant_empty_textbox_drawing(raw)
+            if is_redundant:
+                redundant[name] = count
+
+    if not redundant:
+        return members, 0, 0
+
+    updated = {name: (raw, is_xml) for name, raw, is_xml in members}
+    removed_relation_ids: dict[str, set[str]] = {}
+
+    for rels_name, (raw, is_xml) in list(updated.items()):
+        if not rels_name.endswith(".rels"):
+            continue
+        try:
+            root = ET.fromstring(raw)
+        except ET.ParseError:
+            continue
+
+        removed_ids: set[str] = set()
+        for rel in list(root):
+            target = rel.get("Target", "").replace("\\", "/")
+            target_name = Path(target).name
+            matches = any(
+                drawing_name.endswith(f"/drawings/{target_name}")
+                for drawing_name in redundant
+            )
+            if matches:
+                if rel_id := rel.get("Id"):
+                    removed_ids.add(rel_id)
+                root.remove(rel)
+
+        if removed_ids:
+            owner_name = _owner_part_for_rels(rels_name)
+            if owner_name:
+                removed_relation_ids[owner_name] = removed_ids
+            ET.register_namespace("", _PACKAGE_REL_NS)
+            updated[rels_name] = (
+                ET.tostring(root, encoding="utf-8", xml_declaration=True),
+                is_xml,
+            )
+
+    for owner_name, relation_ids in removed_relation_ids.items():
+        owner = updated.get(owner_name)
+        if owner is None:
+            continue
+        raw, is_xml = owner
+        try:
+            root = ET.fromstring(raw)
+        except ET.ParseError:
+            continue
+        for child in list(root):
+            rel_id = child.get(f"{{{_OFFICE_REL_NS}}}id")
+            if rel_id in relation_ids:
+                root.remove(child)
+        ET.register_namespace("", _SPREADSHEET_NS)
+        ET.register_namespace("r", _OFFICE_REL_NS)
+        updated[owner_name] = (
+            ET.tostring(root, encoding="utf-8", xml_declaration=True),
+            is_xml,
+        )
+
+    for name in redundant:
+        updated.pop(name, None)
+
+    result = [(name, raw, is_xml) for name, (raw, is_xml) in updated.items()]
+    return result, len(redundant), sum(redundant.values())
 
 
 def _is_media_path(name: str) -> bool:
@@ -234,6 +357,10 @@ def compress_ooxml(
                 is_xml = lower.endswith((".xml", ".rels"))
                 members.append((name, raw, is_xml))
 
+    members, drawings_removed, empty_textboxes_removed = (
+        _remove_redundant_excel_drawings(members)
+    )
+
     # Apply renames inside XML parts
     final_members: list[tuple[str, bytes]] = []
     seen: set[str] = set()
@@ -293,6 +420,8 @@ def compress_ooxml(
         "image_bytes_before": bytes_before_images,
         "image_bytes_after": bytes_after_images,
         "renames": len(renames),
+        "drawings_removed": drawings_removed,
+        "empty_textboxes_removed": empty_textboxes_removed,
         "level": level,
     }
     return result, stats

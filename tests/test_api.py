@@ -328,6 +328,106 @@ def test_compress_office_docx(client: TestClient):
     assert "X-Saved-Percent" in res.headers or len(res.content) <= len(docx)
 
 
+def _make_xlsx_with_empty_textboxes(count: int = 120) -> bytes:
+    anchors = []
+    for index in range(count):
+        shape_id = index + 2
+        anchors.append(
+            f'<xdr:oneCellAnchor><xdr:from><xdr:col>3</xdr:col><xdr:colOff>0</xdr:colOff>'
+            f'<xdr:row>4</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>'
+            f'<xdr:ext cx="100" cy="100"/><xdr:sp><xdr:nvSpPr>'
+            f'<xdr:cNvPr id="{shape_id}" name="TextBox {shape_id}"/>'
+            f'<xdr:cNvSpPr txBox="1"/></xdr:nvSpPr><xdr:spPr/>'
+            f'<xdr:txBody><a:bodyPr/><a:lstStyle/><a:p/></xdr:txBody>'
+            f'</xdr:sp><xdr:clientData/></xdr:oneCellAnchor>'
+        )
+
+    drawing = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" '
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+        + "".join(anchors)
+        + "</xdr:wsDr>"
+    )
+    sheet = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        '<sheetData><row r="1"><c r="A1"><f>1+1</f><v>2</v></c></row></sheetData>'
+        '<drawing r:id="rId1"/></worksheet>'
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" '
+        'Target="../drawings/drawing1.xml"/></Relationships>'
+    )
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", "<Types></Types>")
+        zf.writestr("xl/worksheets/sheet1.xml", sheet)
+        zf.writestr("xl/worksheets/_rels/sheet1.xml.rels", rels)
+        zf.writestr("xl/drawings/drawing1.xml", drawing)
+    return buf.getvalue()
+
+
+def test_compress_office_xlsx_removes_mass_empty_textboxes(client: TestClient):
+    workbook = _make_xlsx_with_empty_textboxes()
+    res = client.post(
+        "/api/compress-office",
+        files=[
+            (
+                "files",
+                (
+                    "bloated.xlsx",
+                    workbook,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ),
+            )
+        ],
+        data={"level": "medium"},
+    )
+
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert res.headers["X-Empty-Textboxes-Removed"] == "120"
+    assert len(res.content) < len(workbook)
+
+    with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
+        names = set(zf.namelist())
+        assert "xl/drawings/drawing1.xml" not in names
+        sheet = zf.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        rels = zf.read("xl/worksheets/_rels/sheet1.xml.rels").decode("utf-8")
+        assert "<f>1+1</f>" in sheet
+        assert "drawing" not in sheet
+        assert "drawing1.xml" not in rels
+
+
+def test_compress_office_xlsx_keeps_text_bearing_drawings():
+    from app.office_compress import compress_ooxml
+
+    workbook = _make_xlsx_with_empty_textboxes()
+    with zipfile.ZipFile(io.BytesIO(workbook)) as zin:
+        members = {name: zin.read(name) for name in zin.namelist()}
+    members["xl/drawings/drawing1.xml"] = members[
+        "xl/drawings/drawing1.xml"
+    ].replace(b"<a:p/>", b"<a:p><a:r><a:t>Keep me</a:t></a:r></a:p>", 1)
+
+    rebuilt = io.BytesIO()
+    with zipfile.ZipFile(rebuilt, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+        for name, raw in members.items():
+            zout.writestr(name, raw)
+
+    result, stats = compress_ooxml(rebuilt.getvalue())
+    assert stats["empty_textboxes_removed"] == 0
+    with zipfile.ZipFile(io.BytesIO(result)) as zf:
+        assert "xl/drawings/drawing1.xml" in zf.namelist()
+
+
 def test_convert_detect_pdf_and_pptx(client: TestClient):
     pdf = client.get("/api/convert/detect", params={"filename": "report.PDF"})
     assert pdf.status_code == 200

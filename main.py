@@ -2742,8 +2742,8 @@ def create_app() -> FastAPI:
         level: str = Form("medium"),
     ):
         """
-        Aggressively shrink .docx/.pptx by re-encoding embedded images and
-        repacking the OOXML zip at max DEFLATE.
+        Shrink .docx/.pptx/.xlsx by cleaning redundant Excel drawing objects,
+        re-encoding embedded images, and repacking at max DEFLATE.
         """
         settings = _settings(request)
         validate_file_count(len(files), settings)
@@ -2770,12 +2770,13 @@ def create_app() -> FastAPI:
                 out_path = write_bytes(compressed, ext, settings)
                 processed.append((name, out_path, stats))
                 logger.info(
-                    "office compress %s: %s → %s bytes (%.1f%% saved, %s images)",
+                    "office compress %s: %s → %s bytes (%.1f%% saved, %s images, %s empty Excel text boxes)",
                     name,
                     stats["original_bytes"],
                     stats["compressed_bytes"],
                     stats["saved_percent"],
                     stats["images_touched"],
+                    stats["empty_textboxes_removed"],
                 )
 
             if len(processed) == 1:
@@ -2784,15 +2785,22 @@ def create_app() -> FastAPI:
                 resp = file_response(
                     out_path,
                     filename=f"compressed_{name}",
-                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    if name.lower().endswith(".docx")
-                    else "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    media_type=(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        if name.lower().endswith(".docx")
+                        else "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                        if name.lower().endswith(".pptx")
+                        else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    ),
                     background=background,
                 )
                 resp.headers["X-Original-Bytes"] = str(stats["original_bytes"])
                 resp.headers["X-Compressed-Bytes"] = str(stats["compressed_bytes"])
                 resp.headers["X-Saved-Percent"] = str(stats["saved_percent"])
                 resp.headers["X-Images-Touched"] = str(stats["images_touched"])
+                resp.headers["X-Empty-Textboxes-Removed"] = str(
+                    stats["empty_textboxes_removed"]
+                )
                 return resp
 
             zip_path = make_temp_path(".zip", settings)
@@ -2828,7 +2836,7 @@ def create_app() -> FastAPI:
             logger.exception("office compress failed")
             raise HTTPException(
                 status_code=500,
-                detail="Compression failed. Ensure the file is a valid .docx or .pptx.",
+                detail="Compression failed. Ensure the file is a valid .docx, .pptx, or .xlsx.",
             ) from exc
 
     @app.post("/api/edit/inspect")

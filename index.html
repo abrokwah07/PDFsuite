@@ -484,12 +484,12 @@
 
             <div id="tool-compress-office" class="tool-section hidden h-full flex flex-col">
                 <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Shrink Office files</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Shrink <strong>.docx / .pptx</strong> by re-encoding embedded images (not the same as Compress PDF).</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Shrink <strong>.docx / .pptx / .xlsx</strong>. Excel cleanup also removes large batches of duplicated empty text boxes without touching cell data.</p>
                 <div class="mb-6 flex-grow">
-                    <input type="file" id="compress-office-input" multiple accept=".docx,.pptx" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-rose-50 dark:file:bg-rose-900/20 file:text-rose-700 dark:file:text-rose-400 hover:file:bg-rose-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
+                    <input type="file" id="compress-office-input" multiple accept=".docx,.pptx,.xlsx" class="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-rose-50 dark:file:bg-rose-900/20 file:text-rose-700 dark:file:text-rose-400 hover:file:bg-rose-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1 mb-4" onchange="triggerFileSelect(this)">
                     
                     <label class="block mb-2 text-sm font-medium text-slate-900 dark:text-slate-300">Compression Level</label>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Re-encodes embedded images (resize + JPEG) and max-compresses the package. Best savings on photo-heavy files.</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Re-encodes embedded images and max-compresses the package. For Excel, it also detects and removes drawings made entirely of 100 or more empty text boxes.</p>
                     <select id="compress-office-level" class="w-full text-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-rose-500">
                         <option value="low">Low (Preserve High Quality Images)</option>
                         <option value="medium" selected>Medium (Recommended for Emailing)</option>
